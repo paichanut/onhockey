@@ -17,7 +17,7 @@ const TIMEZONES = [
   { value: '04', label: 'Togliatti (GMT+4)' },
   { value: '05', label: 'Astana (GMT+5)' },
   { value: '06', label: 'Omsk (GMT+6)' },
-  { value: '07', label: 'Novosibirsk (GMT+7)' },
+  { value: '07', label: 'Bangkok (GMT+7)' },
   { value: '08', label: 'Shanghai (GMT+8)' },
   { value: '09', label: 'Tokyo (GMT+9)' },
   { value: '10', label: 'Sydney (GMT+10)' },
