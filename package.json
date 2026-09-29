@@ -1,0 +1,30 @@
+{
+  "name": "onhockey-app",
+  "version": "1.0.0",
+  "description": "Watch ice hockey live streams from onhockey.tv - No ads",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paichanut/onhockey.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/paichanut/onhockey/issues"
+  },
+  "homepage": "https://github.com/paichanut/onhockey#readme",
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "next": "^16.3.6",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  }
+}
