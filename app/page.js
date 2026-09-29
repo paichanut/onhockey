@@ -15,7 +15,7 @@ const TIMEZONES = [
   { value: '04', label: 'Togliatti (GMT+4)' },
   { value: '05', label: 'Astana (GMT+5)' },
   { value: '06', label: 'Omsk (GMT+6)' },
-  { value: '07', label: 'Novosibirsk (GMT+7)' },
+  { value: '07', label: 'Bangkok (GMT+7)' },
   { value: '08', label: 'Shanghai (GMT+8)' },
   { value: '09', label: 'Tokyo (GMT+9)' },
   { value: '10', label: 'Sydney (GMT+10)' },
@@ -88,15 +88,51 @@ export default function Home() {
     }
   };
 
-  const handleStreamClick = async (playerUrl) => {
+  const handleStreamClick = async (streamName) => {
+    // Fetch player page through proxy (CORS + Cloudflare handled)
     try {
-      const response = await fetch(`/api/player?url=${encodeURIComponent(playerUrl)}`);
-      const data = await response.json();
-      if (data.embedUrl) {
-        setEmbedUrl(data.embedUrl);
+      // Search through the current schedule data for this stream name
+      let playerUrl = null;
+      
+      for (const league of leagues) {
+        for (const game of league.games) {
+          if (game.hasLinks) {
+            const stream = game.links.find(l => l.name.toLowerCase() === streamName.toLowerCase());
+            if (stream) {
+              playerUrl = stream.url;
+              break;
+            }
+          }
+        }
+        if (playerUrl) break;
+      }
+
+      if (!playerUrl) {
+        console.error('Stream URL not found');
+        return;
+      }
+
+      // Fetch through proxy (handles Cloudflare + CORS)
+      const proxyUrl = process.env.NEXT_PUBLIC_PROXY_URL || 'https://labouringly-pseudonational-yvonne.ngrok-free.dev';
+      const playerResponse = await fetch(`${proxyUrl}/api/player?url=${encodeURIComponent(playerUrl)}`);
+      if (!playerResponse.ok) {
+        throw new Error('Failed to fetch player page');
+      }
+
+      const playerHtml = await playerResponse.text();
+      
+      // Extract iframe src from the HTML
+      const iframeMatch = playerHtml.match(/<iframe[^>]+src=["']([^"']+)["'][^>]*>/i);
+      if (iframeMatch && iframeMatch[1]) {
+        setEmbedUrl(iframeMatch[1]);
+      } else {
+        // If no iframe found, try to open directly
+        alert('Stream page loaded but no embed found. Opening in new tab...');
+        window.open(`https://onhockey.tv/${playerUrl}`, '_blank');
       }
     } catch (error) {
       console.error('Failed to fetch player:', error);
+      alert('Failed to load stream. Please try again.');
     }
   };
 
@@ -258,7 +294,7 @@ export default function Home() {
             {streamLinks.map((link, index) => (
               <button
                 key={index}
-                onClick={() => handleStreamClick(link.url)}
+                onClick={() => handleStreamClick(link.name)}
                 style={styles.linkBtn}
               >
                 {link.name}

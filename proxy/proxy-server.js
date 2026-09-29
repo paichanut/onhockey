@@ -5,6 +5,17 @@ import * as cheerio from 'cheerio';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Enable CORS for all routes
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // Cache for cookies (cf_clearance)
 let cachedCookies = '';
 let cookieExpiry = 0;
@@ -242,6 +253,32 @@ app.get('/api/links', async (req, res) => {
     res.json(parsed);
   } catch (error) {
     console.error('Links fetch error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Player endpoint - fetch player page HTML for client-side iframe extraction
+app.get('/api/player', async (req, res) => {
+  const { url } = req.query;
+
+  if (!url) {
+    return res.status(400).json({ error: 'Missing url parameter' });
+  }
+
+  try {
+    const cookies = await getCookies();
+    const response = await axios.get('https://onhockey.tv/' + url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Cookie': cookies,
+      },
+      timeout: 15000,
+    });
+
+    // Return full HTML for client to extract iframe
+    res.type('text/html').send(response.data);
+  } catch (error) {
+    console.error('Player fetch error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
