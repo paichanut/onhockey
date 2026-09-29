@@ -13,7 +13,12 @@ A clean, ad-free web interface for watching ice hockey live streams from onhocke
 
 ## How It Works
 
-This app fetches the schedule from onhockey.tv server-side (bypassing ads and redirects) and displays it in a clean interface. Stream links are loaded on-demand when you click on a game.
+Almost everything runs in the browser:
+
+- `/api/schedule` is a thin relay that passes onhockey.tv's raw schedule HTML through. It exists only because browsers can't read onhockey.tv directly (the site sends no CORS headers and requires an onhockey.tv `Referer`). Responses are cached on Vercel's CDN for 60 seconds.
+- The browser parses the schedule, shifts game times to your timezone, and builds each stream's player URL straight from the link (`lib/onhockey.js`). Playing a stream makes no request to onhockey.tv.
+
+If onhockey.tv ever blocks the Vercel server, set `PROXY_URL` in Vercel to a running copy of `proxy/` (e.g. on a home PC behind ngrok); the relay falls back to its `/api/schedule_raw` endpoint.
 
 ## Setup
 
@@ -37,15 +42,11 @@ That's it! Vercel will automatically detect it's a Next.js project and deploy it
 
 ## Architecture
 
-- **Next.js** - React framework with server-side rendering
-- **Cheerio** - HTML parsing for fetching schedule data
-- **Server-side API routes** - Fetches data from onhockey.tv server-side to avoid ads
-
-### API Routes
-
-- `/api/schedule` - Fetches and parses the hockey schedule
-- `/api/links` - Fetches stream links for a specific game
-- `/api/player` - Fetches the embed URL for a stream
+- **Next.js** - React framework
+- **`lib/onhockey.js`** - Browser-side schedule parsing and stream URL resolution
+- **`app/api/schedule`** - The only server route: relays the raw schedule HTML
+- **hls.js** - Plays `.m3u8` streams in browsers without native HLS
+- **`proxy/`** - Optional Express fallback relay for when the Vercel server is blocked
 
 ## License
 

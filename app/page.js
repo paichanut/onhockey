@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { parseSchedule, resolveStream, shiftHour } from '@/lib/onhockey';
 
 const TIMEZONES = [
   { value: '-08', label: 'Anchorage (AKDT/GMT-8)' },
@@ -8,6 +9,7 @@ const TIMEZONES = [
   { value: '-06', label: 'Denver (MDT/GMT-6)' },
   { value: '-05', label: 'Chicago (CDT/GMT-5)' },
   { value: '-04', label: 'New York (EDT/GMT-4)' },
+  { value: '-03', label: 'Halifax (ADT/GMT-3)' },
   { value: '00', label: 'Reykjavik (GMT0)' },
   { value: '01', label: 'London (GMT+1)' },
   { value: '02', label: 'Stockholm (GMT+2)' },
@@ -37,29 +39,53 @@ const LEAGUE_FILTERS = [
   { value: 'INT', label: 'International' },
 ];
 
+// Plays .m3u8 streams: natively in Safari, via hls.js everywhere else.
+function HlsVideo({ src }) {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = src;
+      return;
+    }
+    let hls;
+    import('hls.js').then(({ default: Hls }) => {
+      if (!Hls.isSupported()) return;
+      hls = new Hls();
+      hls.loadSource(src);
+      hls.attachMedia(video);
+    });
+    return () => hls?.destroy();
+  }, [src]);
+
+  return <video ref={videoRef} style={styles.iframe} controls autoPlay />;
+}
+
 export default function Home() {
   const [leagues, setLeagues] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
-  const [streamLinks, setStreamLinks] = useState([]);
-  const [loadingLinks, setLoadingLinks] = useState(false);
-  const [embedUrl, setEmbedUrl] = useState(null);
+  const [stream, setStream] = useState(null);
   const [timezone, setTimezone] = useState('07');
   const [filters, setFilters] = useState([]);
   const [showAll, setShowAll] = useState(true);
 
   const fetchSchedule = async () => {
     setLoading(true);
-    setEmbedUrl(null);
-    setSelectedGame(null);
-    setStreamLinks([]);
+    setError(null);
 
     try {
-      const response = await fetch(`/api/schedule?timezone=${timezone}`);
-      const data = await response.json();
-      setLeagues(data.leagues);
-    } catch (error) {
-      console.error('Failed to fetch schedule:', error);
+      // The relay only passes onhockey.tv's HTML through; parsing happens here.
+      const response = await fetch('/api/schedule', { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Schedule unavailable (${response.status})`);
+      }
+      setLeagues(parseSchedule(await response.text()));
+    } catch (err) {
+      console.error('Failed to fetch schedule:', err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -67,36 +93,14 @@ export default function Home() {
 
   useEffect(() => {
     fetchSchedule();
-  }, [timezone]);
+  }, []);
 
-  const handleGameClick = async (leagueIndex, gameIndex, leagueName, teams, time) => {
-    setSelectedGame({ leagueIndex, gameIndex, leagueName, teams, time });
-    setStreamLinks([]);
-    setEmbedUrl(null);
-
-    setLoadingLinks(true);
-    try {
-      const response = await fetch(`/api/links?league=${encodeURIComponent(leagueName)}&game=${gameIndex}`);
-      const data = await response.json();
-      if (data.links) {
-        setStreamLinks(data.links);
-      }
-    } catch (error) {
-      console.error('Failed to fetch links:', error);
-    } finally {
-      setLoadingLinks(false);
-    }
-  };
-
-  const handleStreamClick = async (playerUrl) => {
-    try {
-      const response = await fetch(`/api/player?url=${encodeURIComponent(playerUrl)}`);
-      const data = await response.json();
-      if (data.embedUrl) {
-        setEmbedUrl(data.embedUrl);
-      }
-    } catch (error) {
-      console.error('Failed to fetch player:', error);
+  const handleStreamClick = (link) => {
+    const resolved = resolveStream(link.url);
+    if (resolved.type === 'external') {
+      window.open(resolved.url, '_blank', 'noopener');
+    } else {
+      setStream(resolved);
     }
   };
 
@@ -146,16 +150,6 @@ export default function Home() {
         <button onClick={fetchSchedule} style={styles.refreshBtn} disabled={loading}>
           {loading ? 'Loading...' : '🔄 Refresh Schedule'}
         </button>
-
-        {selectedGame && (
-          <button
-            onClick={() => handleGameClick(selectedGame.leagueIndex, selectedGame.gameIndex, selectedGame.leagueName, selectedGame.teams, selectedGame.time)}
-            style={styles.refreshBtn}
-            disabled={loadingLinks}
-          >
-            {loadingLinks ? 'Loading...' : '🔄 Refresh Stream Links'}
-          </button>
-        )}
       </div>
 
       <div style={styles.filters}>
@@ -180,26 +174,58 @@ export default function Home() {
       </div>
 
       <div style={styles.main}>
-        {embedUrl && (
+        {stream && (
           <div style={styles.player}>
             <div style={styles.playerHeader}>
               <h3 style={styles.playerTitle}>{selectedGame?.teams}</h3>
-              <button onClick={() => setEmbedUrl(null)} style={styles.closeBtn}>
+              <button onClick={() => setStream(null)} style={styles.closeBtn}>
                 ✕
               </button>
             </div>
-            <iframe
-              src={embedUrl}
-              style={styles.iframe}
-              allowFullScreen
-              allow="autoplay; encrypted-media"
-            />
+            {stream.type === 'hls' ? (
+              <HlsVideo src={stream.url} />
+            ) : (
+              <iframe
+                src={stream.url}
+                style={styles.iframe}
+                allowFullScreen
+                allow="autoplay; encrypted-media; fullscreen"
+              />
+            )}
+          </div>
+        )}
+
+        {selectedGame && (
+          <div style={styles.linksPanel}>
+            <h3 style={styles.linksTitle}>Available Streams for: {selectedGame.teams}</h3>
+            {selectedGame.links.length === 0 ? (
+              <span style={styles.noLinks}>Stream available closer to game time</span>
+            ) : (
+              <div style={styles.linksGrid}>
+                {selectedGame.links.map((link, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleStreamClick(link)}
+                    style={styles.linkBtn}
+                  >
+                    {link.name}
+                    {(link.language || link.title) && (
+                      <span style={styles.linkTitle}>
+                        {[link.language, link.title].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         <div style={styles.schedule}>
           {loading && !leagues.length ? (
             <div style={styles.loading}>Loading schedule...</div>
+          ) : error && !leagues.length ? (
+            <div style={styles.loading}>Could not load schedule: {error}</div>
           ) : filteredLeagues.length === 0 ? (
             <div style={styles.loading}>No games found for selected filters</div>
           ) : (
@@ -209,22 +235,23 @@ export default function Home() {
                   <h2 style={styles.leagueName}>{league.name}</h2>
                 </div>
                 {league.games.map((game, gameIndex) => {
-                  const isSelected =
-                    selectedGame?.leagueIndex === leagueIndex &&
-                    selectedGame?.gameIndex === gameIndex;
+                  const isSelected = selectedGame === game;
 
                   return (
                     <div
                       key={gameIndex}
-                      onClick={() =>
-                        handleGameClick(leagueIndex, gameIndex, league.name, game.teams, game.time)
-                      }
+                      onClick={() => {
+                        setSelectedGame(game);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
                       style={{
                         ...styles.gameRow,
                         ...(isSelected ? styles.gameRowSelected : {}),
                       }}
                     >
-                      <div style={styles.gameTime}>{game.time}</div>
+                      <div style={styles.gameTime}>
+                        {shiftHour(game.hour, timezone)}:{game.minutes}
+                      </div>
                       <div style={styles.gameTeams}>
                         {game.teams}
                         {game.isLive && (
@@ -234,7 +261,7 @@ export default function Home() {
                         )}
                       </div>
                       <div style={styles.gameStatus}>
-                        {game.hasLinks ? (
+                        {game.links.length > 0 ? (
                           <span style={styles.hasLinks}>📺 Click for links</span>
                         ) : (
                           <span style={styles.noLinks}>
@@ -250,24 +277,6 @@ export default function Home() {
           )}
         </div>
       </div>
-
-      {selectedGame && streamLinks.length > 0 && !embedUrl && (
-        <div style={styles.linksPanel}>
-          <h3 style={styles.linksTitle}>Available Streams for: {selectedGame.teams}</h3>
-          <div style={styles.linksGrid}>
-            {streamLinks.map((link, index) => (
-              <button
-                key={index}
-                onClick={() => handleStreamClick(link.url)}
-                style={styles.linkBtn}
-              >
-                {link.name}
-                {link.title && <span style={styles.linkTitle}>{link.title}</span>}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
