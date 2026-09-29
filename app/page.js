@@ -70,14 +70,13 @@ export default function Home() {
   }, [timezone]);
 
   const handleGameClick = async (leagueIndex, gameIndex, leagueName, teams, time) => {
-    const gameKey = `${leagueIndex}:${gameIndex}`;
     setSelectedGame({ leagueIndex, gameIndex, leagueName, teams, time });
     setStreamLinks([]);
     setEmbedUrl(null);
 
     setLoadingLinks(true);
     try {
-      const response = await fetch(`/api/links?game=${gameKey}`);
+      const response = await fetch(`/api/links?league=${encodeURIComponent(leagueName)}&game=${gameIndex}`);
       const data = await response.json();
       if (data.links) {
         setStreamLinks(data.links);

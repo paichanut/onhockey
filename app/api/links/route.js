@@ -3,54 +3,83 @@ import * as cheerio from 'cheerio';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
-  const gameKey = searchParams.get('game'); // league_index:game_index
-  const source = searchParams.get('source'); // youtube, wcaster, etc.
+  const leagueName = searchParams.get('league');
+  const gameIndex = parseInt(searchParams.get('game'));
+  const source = searchParams.get('source');
 
   try {
-    if (!gameKey || !source) {
-      return NextResponse.json({ error: 'Missing game or source parameter' }, { status: 400 });
+    if (isNaN(gameIndex)) {
+      return NextResponse.json({ error: 'Missing game parameter' }, { status: 400 });
     }
 
-    const [leagueIndex, gameIndex] = gameKey.split(':');
-
-    // Fetch the main page to get the schedule
-    const pageResponse = await fetch('https://onhockey.tv/', {
+    // Fetch schedule data
+    const scheduleResponse = await fetch('https://onhockey.tv/schedule_table.php', {
       headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Referer': 'https://onhockey.tv/',
       },
       cache: 'no-store',
     });
 
-    if (!pageResponse.ok) {
-      return NextResponse.json({ error: 'Failed to fetch page' }, { status: 500 });
+    if (!scheduleResponse.ok) {
+      return NextResponse.json({ error: `Schedule fetch failed: ${scheduleResponse.status}` }, { status: 500 });
     }
 
-    const html = await pageResponse.text();
-    const $ = cheerio.load(html);
+    const scheduleHtml = await scheduleResponse.text();
+    const cleanedHtml = scheduleHtml
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
 
-    // Find the specific game and get its stream links
-    const league = $('tbody').eq(parseInt(leagueIndex));
-    const gameRow = league.find('tr.game').eq(parseInt(gameIndex));
+    const $ = cheerio.load(cleanedHtml, { xmlMode: false, decodeEntities: true });
+
+    // Find the league by name
+    let targetLeague = null;
+    let foundLeagueName = null;
+    
+    if (leagueName) {
+      // Find league by name
+      $('#gametable tbody').each(function () {
+        const tbody = $(this);
+        const firstTr = tbody.find('tr').first();
+        const name = firstTr.find('td:nth-child(2) b').text().trim();
+        if (name === leagueName) {
+          targetLeague = tbody;
+          foundLeagueName = name;
+          return false; // break
+        }
+      });
+    } else {
+      // Fallback: use first league
+      targetLeague = $('#gametable tbody').first();
+    }
+
+    if (!targetLeague) {
+      return NextResponse.json({ error: 'League not found', links: [] }, { status: 404 });
+    }
+
+    const gameRow = targetLeague.find('tr.game').eq(gameIndex);
+
+    if (gameRow.length === 0) {
+      return NextResponse.json({ error: 'Game not found', links: [] }, { status: 404 });
+    }
 
     const links = gameRow.find('.gamelinks a').map(function () {
       return {
         name: $(this).text().trim(),
         url: $(this).attr('href'),
-        title: $(this).attr('title'),
+        title: $(this).attr('title') || '',
       };
-    });
+    }).toArray();
 
-    // If specific source requested, fetch the player page
-    if (source) {
-      const sourceLink = gameRow.find(`.gamelinks a:contains("${source}")`).first();
-      const playerUrl = sourceLink.attr('href');
-
-      if (playerUrl) {
-        const playerResponse = await fetch('https://onhockey.tv/' + playerUrl, {
+    // If specific source requested, get embed URL
+    if (source && links.length > 0) {
+      const sourceLink = links.find(l => l.name.toLowerCase() === source.toLowerCase());
+      if (sourceLink && sourceLink.url) {
+        const playerResponse = await fetch('https://onhockey.tv/' + sourceLink.url, {
           headers: {
-            'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           },
           cache: 'no-store',
         });
@@ -58,19 +87,15 @@ export async function GET(request) {
         if (playerResponse.ok) {
           const playerHtml = await playerResponse.text();
           const player$ = cheerio.load(playerHtml);
-
           const iframe = player$('iframe').first();
           const embedUrl = iframe.attr('src');
-
-          return NextResponse.json({
-            embedUrl: embedUrl,
-            title: player$('title').text().trim(),
-          });
+          const title = player$('title').text().trim();
+          return NextResponse.json({ embedUrl, title });
         }
       }
     }
 
-    return NextResponse.json({ links: links.toArray() });
+    return NextResponse.json({ links, league: foundLeagueName });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
