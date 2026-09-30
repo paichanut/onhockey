@@ -60,9 +60,10 @@ async function fetchScheduleHtml() {
       'Cookie': cookies,
     },
     timeout: 15000,
+    responseType: 'arraybuffer',
   });
 
-  return response.data;
+  return new TextDecoder('windows-1251').decode(response.data);
 }
 
 // Parse schedule HTML into JSON
@@ -223,6 +224,17 @@ app.get('/api/schedule', async (req, res) => {
   } catch (error) {
     console.error('Schedule fetch error:', error.message);
     res.status(500).json({ error: error.message, leagues: [] });
+  }
+});
+
+// Raw schedule HTML (UTF-8) for the Vercel relay's fallback; the site parses it in the browser.
+app.get('/api/schedule_raw', async (req, res) => {
+  try {
+    const html = await fetchScheduleHtml();
+    res.type('html').send(html);
+  } catch (error) {
+    console.error('Raw schedule fetch error:', error.message);
+    res.status(502).send(error.message);
   }
 });
 
