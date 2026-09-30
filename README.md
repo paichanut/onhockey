@@ -18,7 +18,14 @@ Almost everything runs in the browser:
 - `/api/schedule` is a thin relay that passes onhockey.tv's raw schedule HTML through. It exists only because browsers can't read onhockey.tv directly (the site sends no CORS headers and requires an onhockey.tv `Referer`). Responses are cached on Vercel's CDN for 60 seconds.
 - The browser parses the schedule, shifts game times to your timezone, and builds each stream's player URL straight from the link (`lib/onhockey.js`). Playing a stream makes no request to onhockey.tv.
 
-If onhockey.tv ever blocks the Vercel server, set `PROXY_URL` in Vercel to a running copy of `proxy/` (e.g. on a home PC behind ngrok); the relay falls back to its `/api/schedule_raw` endpoint.
+Cloudflare shows Vercel's servers a bot challenge, so on Vercel the relay gets the schedule through the home-PC proxy in `proxy/`, exposed with ngrok. Keep it running:
+
+```bash
+cd proxy && npm install && npm start          # listens on port 3001
+ngrok http --url=labouringly-pseudonational-yvonne.ngrok-free.dev 3001
+```
+
+Set `PROXY_URL` in Vercel to use a different proxy address.
 
 ## Setup
 

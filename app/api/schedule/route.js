@@ -4,8 +4,12 @@
 
 const SCHEDULE_URL = 'https://onhockey.tv/schedule_table.php';
 
-// Optional fallback (e.g. the home-PC proxy in proxy/) if onhockey.tv blocks this server.
-const PROXY_URL = process.env.PROXY_URL || process.env.NEXT_PUBLIC_PROXY_URL;
+// Fallback: the home-PC proxy in proxy/, exposed through ngrok. Cloudflare shows
+// Vercel's servers a bot challenge, so on Vercel this is the path that works.
+const PROXY_URL =
+  process.env.PROXY_URL ||
+  process.env.NEXT_PUBLIC_PROXY_URL ||
+  'https://labouringly-pseudonational-yvonne.ngrok-free.dev';
 
 const HEADERS = {
   'User-Agent':
@@ -44,9 +48,6 @@ export async function GET() {
   try {
     html = await fetchDirect();
   } catch (directError) {
-    if (!PROXY_URL) {
-      return new Response(directError.message, { status: 502 });
-    }
     try {
       html = await fetchViaProxy();
     } catch (proxyError) {
