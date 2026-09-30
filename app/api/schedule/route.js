@@ -18,7 +18,14 @@ const HEADERS = {
 
 async function fetchDirect() {
   const response = await fetch(SCHEDULE_URL, { headers: HEADERS, cache: 'no-store' });
-  if (!response.ok) throw new Error(`onhockey.tv responded ${response.status}`);
+  if (!response.ok) {
+    // Include a snippet so a block (Cloudflare page vs. the site's own refusal) is visible.
+    const snippet = (await response.text()).replace(/\s+/g, ' ').slice(0, 200);
+    throw new Error(
+      `onhockey.tv responded ${response.status} (server: ${response.headers.get('server')}, ` +
+        `cf-mitigated: ${response.headers.get('cf-mitigated')}): ${snippet}`
+    );
+  }
   // onhockey.tv serves windows-1251; decode it so the browser gets clean UTF-8.
   return new TextDecoder('windows-1251').decode(await response.arrayBuffer());
 }
