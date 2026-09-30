@@ -80,7 +80,11 @@ export default function Home() {
       // The relay only passes onhockey.tv's HTML through; parsing happens here.
       const response = await fetch('/api/schedule', { cache: 'no-store' });
       if (!response.ok) {
-        throw new Error(`Schedule unavailable (${response.status})`);
+        throw new Error(
+          response.status === 502
+            ? 'onhockey.tv blocks Vercel, and the home proxy is not reachable. Start the proxy and ngrok on your PC.'
+            : `Schedule unavailable (${response.status})`
+        );
       }
       setLeagues(parseSchedule(await response.text()));
     } catch (err) {
