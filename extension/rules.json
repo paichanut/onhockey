@@ -1,0 +1,22 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://onhockey.tv/"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "|https://onhockey.tv/schedule_table.php",
+      "resourceTypes": [
+        "xmlhttprequest"
+      ]
+    }
+  }
+]

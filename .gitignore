@@ -29,3 +29,6 @@ yarn-error.log*
 .vercel
 
 .vercel
+
+# chromium writes this when loading the unpacked extension
+extension/_metadata/

@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { parseSchedule, resolveStream, shiftHour } from '@/lib/onhockey';
+import {
+  parseSchedule,
+  resolveStream,
+  shiftHour,
+  hasExtension,
+  fetchScheduleViaExtension,
+} from '@/lib/onhockey';
 
 const TIMEZONES = [
   { value: '-08', label: 'Anchorage (AKDT/GMT-8)' },
@@ -66,6 +72,7 @@ export default function Home() {
   const [leagues, setLeagues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [needsExtension, setNeedsExtension] = useState(false);
   const [selectedGame, setSelectedGame] = useState(null);
   const [stream, setStream] = useState(null);
   const [timezone, setTimezone] = useState('07');
@@ -77,16 +84,19 @@ export default function Home() {
     setError(null);
 
     try {
-      // The relay only passes onhockey.tv's HTML through; parsing happens here.
-      const response = await fetch('/api/schedule', { cache: 'no-store' });
-      if (!response.ok) {
-        throw new Error(
-          response.status === 502
-            ? 'onhockey.tv blocks Vercel, and the home proxy is not reachable. Start the proxy and ngrok on your PC.'
-            : `Schedule unavailable (${response.status})`
-        );
+      let html;
+      if (hasExtension()) {
+        html = await fetchScheduleViaExtension();
+      } else {
+        // Without the extension, try the server relay (works only while the home proxy runs).
+        const response = await fetch('/api/schedule', { cache: 'no-store' });
+        if (!response.ok) {
+          setNeedsExtension(true);
+          throw new Error('Install the OnHockey helper extension to load the schedule.');
+        }
+        html = await response.text();
       }
-      setLeagues(parseSchedule(await response.text()));
+      setLeagues(parseSchedule(html));
     } catch (err) {
       console.error('Failed to fetch schedule:', err);
       setError(err.message);
@@ -228,6 +238,23 @@ export default function Home() {
         <div style={styles.schedule}>
           {loading && !leagues.length ? (
             <div style={styles.loading}>Loading schedule...</div>
+          ) : needsExtension && !leagues.length ? (
+            <div style={styles.install}>
+              <h3 style={styles.linksTitle}>One-time setup: install the helper extension</h3>
+              <p style={styles.installText}>
+                onhockey.tv blocks requests from Vercel's servers, so this site loads the schedule
+                through your own browser with a small extension (Chrome or Edge on a computer).
+              </p>
+              <ol style={styles.installText}>
+                <li>
+                  <a href="/onhockey-extension.zip" style={styles.installLink}>Download the extension</a>{' '}
+                  and unzip it.
+                </li>
+                <li>Open <code>chrome://extensions</code> (or <code>edge://extensions</code>).</li>
+                <li>Turn on <b>Developer mode</b>, click <b>Load unpacked</b>, and pick the unzipped folder.</li>
+                <li>Come back here and refresh the page.</li>
+              </ol>
+            </div>
           ) : error && !leagues.length ? (
             <div style={styles.loading}>Could not load schedule: {error}</div>
           ) : filteredLeagues.length === 0 ? (
@@ -498,6 +525,22 @@ const styles = {
     alignItems: 'center',
     gap: '8px',
     transition: 'background-color 0.2s',
+  },
+  install: {
+    maxWidth: '640px',
+    margin: '40px auto',
+    padding: '20px 24px',
+    backgroundColor: '#111',
+    border: '1px solid #333',
+    borderRadius: '8px',
+  },
+  installText: {
+    color: '#ccc',
+    fontSize: '14px',
+    lineHeight: 1.6,
+  },
+  installLink: {
+    color: '#4da3ff',
   },
   linkTitle: {
     fontSize: '11px',
