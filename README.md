@@ -13,19 +13,21 @@ A clean, ad-free web interface for watching ice hockey live streams from onhocke
 
 ## How It Works
 
-Almost everything runs in the browser:
+Everything runs in your browser:
 
-- `/api/schedule` is a thin relay that passes onhockey.tv's raw schedule HTML through. It exists only because browsers can't read onhockey.tv directly (the site sends no CORS headers and requires an onhockey.tv `Referer`). Responses are cached on Vercel's CDN for 60 seconds.
-- The browser parses the schedule, shifts game times to your timezone, and builds each stream's player URL straight from the link (`lib/onhockey.js`). Playing a stream makes no request to onhockey.tv.
+- onhockey.tv's Cloudflare blocks requests from Vercel's servers, and a normal web page isn't allowed to read another site. So the **OnHockey Live Helper** browser extension (`extension/`) fetches the schedule with your own browser and hands it to the page.
+- The page parses the schedule, shifts game times to your timezone, and builds each stream's player URL straight from the link (`lib/onhockey.js`).
 
-Cloudflare shows Vercel's servers a bot challenge, so on Vercel the relay gets the schedule through the home-PC proxy in `proxy/`, exposed with ngrok. Keep it running:
+### Install the extension (Chrome or Edge on a computer, one time)
 
-```bash
-cd proxy && npm install && npm start          # listens on port 3001
-ngrok http --url=labouringly-pseudonational-yvonne.ngrok-free.dev 3001
-```
+1. Download [onhockey-extension.zip](https://onhockey.vercel.app/onhockey-extension.zip) and unzip it.
+2. Open `chrome://extensions` (or `edge://extensions`).
+3. Turn on **Developer mode**, click **Load unpacked**, and pick the unzipped folder.
+4. Refresh onhockey.vercel.app.
 
-Set `PROXY_URL` in Vercel to use a different proxy address.
+After changing `extension/`, rebuild the download with `cd extension && zip -qr ../public/onhockey-extension.zip .`
+
+Without the extension, `/api/schedule` tries a server relay, which only works while the optional home-PC proxy in `proxy/` is running behind ngrok (`cd proxy && npm start`, then `ngrok http --url=labouringly-pseudonational-yvonne.ngrok-free.dev 3001`).
 
 ## Setup
 
