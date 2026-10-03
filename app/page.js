@@ -46,6 +46,7 @@ const LEAGUE_FILTERS = [
   { value: 'LV', label: 'Baltic/Poland' },
   { value: 'OTH', label: 'UK & others' },
   { value: 'INT', label: 'International' },
+  { value: 'TH', label: 'Thailand' },
 ];
 
 // Plays .m3u8 streams: natively in Safari, via hls.js everywhere else.
@@ -121,9 +122,21 @@ export default function Home() {
   const [playing, setPlaying] = useState(null); // { key, linkUrl, linkName, stream }
   const [timezone, setTimezone] = useState('07');
   const [filters, setFilters] = useState([]);
+  const [channels, setChannels] = useState([]);
   const narrow = useNarrow();
 
+  // YouTube channels (e.g. Thai ice hockey) load independently of the onhockey.tv schedule.
+  const fetchChannels = async () => {
+    try {
+      const response = await fetch('/api/youtube', { cache: 'no-store' });
+      if (response.ok) setChannels((await response.json()).channels || []);
+    } catch (err) {
+      console.error('Failed to fetch YouTube channels:', err);
+    }
+  };
+
   const fetchSchedule = async () => {
+    fetchChannels();
     setLoading(true);
     setError(null);
 
@@ -175,6 +188,17 @@ export default function Home() {
     setPlaying({ key, linkUrl: link.url, linkName: link.name, teams: game.teams, league: league.name, hour: game.hour, minutes: game.minutes, stream });
   };
 
+  const playVideo = (key, channel, video) => {
+    setPlaying({
+      key,
+      linkUrl: video.id,
+      linkName: 'YouTube',
+      teams: video.title,
+      metaText: `${channel.name} · YouTube`,
+      stream: { type: 'iframe', url: `https://www.youtube.com/embed/${video.id}?autoplay=1` },
+    });
+  };
+
   const toggleFilter = (value) => {
     setFilters(filters.includes(value) ? filters.filter((f) => f !== value) : [...filters, value]);
   };
@@ -185,6 +209,11 @@ export default function Home() {
     games: league.games.map((game, gi) => ({ ...game, key: `${li}-${gi}` })),
   }));
   const shown = filters.length ? keyed.filter((league) => filters.includes(league.class)) : keyed;
+  // Only streams that are live right now; past and upcoming ones stay on YouTube.
+  const shownChannels = (!filters.length || filters.includes('TH') ? channels : []).map((c) => ({
+    ...c,
+    videos: c.videos.filter((v) => v.status === 'live'),
+  }));
   const liveCount = leagues.reduce((n, l) => n + l.games.filter((g) => g.isLive).length, 0);
   const time = (g) => `${shiftHour(g.hour, timezone)}:${g.minutes}`;
 
@@ -226,6 +255,56 @@ export default function Home() {
 
       <main className="wrap main">
         <section className="schedule" aria-label="Schedule">
+          {shownChannels.map((channel, ci) => (
+            <div key={channel.url} className="league">
+              <div className="league-head">
+                <h2>{channel.name}</h2>
+                <span>{channel.region} · YouTube</span>
+              </div>
+              {channel.videos.length === 0 && (
+                <p className="note channel-idle">
+                  No live stream right now ·{' '}
+                  <a href={channel.url} target="_blank" rel="noopener noreferrer">Open channel</a>
+                </p>
+              )}
+              {channel.videos.map((video) => {
+                const key = `yt-${ci}-${video.id}`;
+                const isOpen = openKey === key;
+                const on = playing?.key === key;
+                return (
+                  <div key={key} className={isOpen ? 'game is-open' : 'game'}>
+                    <button
+                      type="button"
+                      className="game-row"
+                      aria-expanded={isOpen}
+                      aria-controls={`drop-${key}`}
+                      onClick={() => setOpenKey(isOpen ? null : key)}
+                    >
+                      <span className="game-time yt"><span className="live">LIVE</span></span>
+                      <span className="game-teams">{video.title}</span>
+                      {video.when && <span className="game-links soon">{video.when}</span>}
+                      <Chevron />
+                    </button>
+                    {isOpen && (
+                      <div className="drop" id={`drop-${key}`}>
+                        {narrow && on && <Player stream={playing.stream} />}
+                        <div className="streams">
+                          <button type="button" className="stream" aria-pressed={on} onClick={() => playVideo(key, channel, video)}>
+                            <b>Watch here</b>
+                            <small>YouTube</small>
+                          </button>
+                          <a className="stream" href={`https://www.youtube.com/watch?v=${video.id}`} target="_blank" rel="noopener noreferrer">
+                            <b>Open on YouTube<ExternalIcon /></b>
+                            <small>{channel.name}</small>
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
           {loading && !leagues.length ? (
             <div className="empty">Loading schedule…</div>
           ) : needsExtension && !leagues.length ? (
@@ -261,7 +340,7 @@ export default function Home() {
             </div>
           ) : error && !leagues.length ? (
             <div className="empty">Could not load the schedule: {error}</div>
-          ) : shown.length === 0 ? (
+          ) : shown.length === 0 && shownChannels.length === 0 ? (
             <div className="empty">No games for the selected regions.</div>
           ) : (
             shown.map((league) => (
@@ -332,7 +411,9 @@ export default function Home() {
           <div className="now">
             <div>
               <div className="now-meta">
-                {playing ? `${playing.league} · ${shiftHour(playing.hour, timezone)}:${playing.minutes}` : 'Nothing playing'}
+                {!playing
+                  ? 'Nothing playing'
+                  : playing.metaText ?? `${playing.league} · ${shiftHour(playing.hour, timezone)}:${playing.minutes}`}
               </div>
               <h1>{playing ? playing.teams : 'Pick a game'}</h1>
             </div>
