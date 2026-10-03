@@ -7,6 +7,9 @@ import {
   shiftHour,
   hasExtension,
   fetchScheduleViaExtension,
+  openedByBookmarklet,
+  fetchScheduleViaBookmarklet,
+  BOOKMARKLET,
 } from '@/lib/onhockey';
 
 const TIMEZONES = [
@@ -73,6 +76,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [needsExtension, setNeedsExtension] = useState(false);
+  const bookmarkletRef = useRef(null);
   const [selectedGame, setSelectedGame] = useState(null);
   const [stream, setStream] = useState(null);
   const [timezone, setTimezone] = useState('07');
@@ -87,12 +91,14 @@ export default function Home() {
       let html;
       if (hasExtension()) {
         html = await fetchScheduleViaExtension();
+      } else if (openedByBookmarklet()) {
+        html = await fetchScheduleViaBookmarklet();
       } else {
         // Without the extension, try the server relay (works only while the home proxy runs).
         const response = await fetch('/api/schedule', { cache: 'no-store' });
         if (!response.ok) {
           setNeedsExtension(true);
-          throw new Error('Install the OnHockey helper extension to load the schedule.');
+          throw new Error('Use the OnHockey bookmark or extension to load the schedule.');
         }
         html = await response.text();
       }
@@ -108,6 +114,11 @@ export default function Home() {
   useEffect(() => {
     fetchSchedule();
   }, []);
+
+  // React blocks javascript: URLs in href, so set the bookmarklet's address directly.
+  useEffect(() => {
+    bookmarkletRef.current?.setAttribute('href', BOOKMARKLET);
+  }, [needsExtension]);
 
   const handleStreamClick = (link) => {
     const resolved = resolveStream(link.url);
@@ -240,11 +251,30 @@ export default function Home() {
             <div style={styles.loading}>Loading schedule...</div>
           ) : needsExtension && !leagues.length ? (
             <div style={styles.install}>
-              <h3 style={styles.linksTitle}>One-time setup: install the helper extension</h3>
+              <h3 style={styles.linksTitle}>One-time setup</h3>
               <p style={styles.installText}>
-                onhockey.tv blocks requests from Vercel's servers, so this site loads the schedule
-                through your own browser with a small extension (Chrome or Edge on a computer).
+                onhockey.tv only shares its schedule with its own pages, so this site gets it through
+                your browser. Pick one:
               </p>
+              <h4 style={styles.installHeading}>Option 1: Bookmark (nothing to install)</h4>
+              <ol style={styles.installText}>
+                <li>
+                  Drag this button to your bookmarks bar:{' '}
+                  <a ref={bookmarkletRef} style={styles.bookmarklet} onClick={(e) => e.preventDefault()}>
+                    🏒 OnHockey Clean
+                  </a>
+                </li>
+                <li>Open <b>onhockey.tv</b> and click the bookmark. This clean page opens with the schedule.</li>
+                <li>Keep the onhockey.tv tab open in the background so Refresh keeps working.</li>
+              </ol>
+              <details style={styles.installText}>
+                <summary>On a phone, or can't drag?</summary>
+                Bookmark any page, edit the bookmark, and replace its address with this code:
+                <textarea readOnly value={BOOKMARKLET} style={styles.codeBox} onFocus={(e) => e.target.select()} />
+                Then open onhockey.tv and pick the bookmark (on Android Chrome, type its name in the
+                address bar and tap it).
+              </details>
+              <h4 style={styles.installHeading}>Option 2: Extension (Chrome or Edge on a computer)</h4>
               <ol style={styles.installText}>
                 <li>
                   <a href="/onhockey-extension.zip" style={styles.installLink}>Download the extension</a>{' '}
@@ -252,7 +282,7 @@ export default function Home() {
                 </li>
                 <li>Open <code>chrome://extensions</code> (or <code>edge://extensions</code>).</li>
                 <li>Turn on <b>Developer mode</b>, click <b>Load unpacked</b>, and pick the unzipped folder.</li>
-                <li>Come back here and refresh the page.</li>
+                <li>Refresh this page. From then on, just open this site.</li>
               </ol>
             </div>
           ) : error && !leagues.length ? (
@@ -538,6 +568,31 @@ const styles = {
     color: '#ccc',
     fontSize: '14px',
     lineHeight: 1.6,
+  },
+  installHeading: {
+    margin: '20px 0 4px',
+    fontSize: '14px',
+    color: '#fff',
+  },
+  bookmarklet: {
+    display: 'inline-block',
+    padding: '6px 12px',
+    backgroundColor: '#0066cc',
+    color: '#fff',
+    borderRadius: '4px',
+    textDecoration: 'none',
+    cursor: 'grab',
+  },
+  codeBox: {
+    display: 'block',
+    width: '100%',
+    height: '90px',
+    margin: '8px 0',
+    backgroundColor: '#000',
+    color: '#9cf',
+    border: '1px solid #333',
+    fontSize: '11px',
+    fontFamily: 'monospace',
   },
   installLink: {
     color: '#4da3ff',

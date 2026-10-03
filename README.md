@@ -13,10 +13,14 @@ A clean, ad-free web interface for watching ice hockey live streams from onhocke
 
 ## How It Works
 
-Everything runs in your browser:
+Everything runs in your browser. The schedule comes from code running with your own access to onhockey.tv: a bookmark (nothing to install) or the helper extension.
 
 - onhockey.tv's Cloudflare blocks requests from Vercel's servers, and a normal web page isn't allowed to read another site. So the **OnHockey Live Helper** browser extension (`extension/`) fetches the schedule with your own browser and hands it to the page.
 - The page parses the schedule, shifts game times to your timezone, and builds each stream's player URL straight from the link (`lib/onhockey.js`).
+
+### Bookmark (nothing to install)
+
+On onhockey.vercel.app's setup screen, drag **🏒 OnHockey Clean** to your bookmarks bar. Open onhockey.tv and click it: the clean site opens with the schedule, and Refresh keeps working while the onhockey.tv tab stays open.
 
 ### Install the extension (Chrome or Edge on a computer, one time)
 
