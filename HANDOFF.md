@@ -16,6 +16,49 @@ Both the bookmark and the extension work on any `*.vercel.app` address. The book
 cd extension && zip -qr ../public/onhockey-extension.zip .
 ```
 
+## Home server (Ubuntu): links with no extension or bookmark
+
+onhockey.tv doesn't block home internet connections. With the proxy in `proxy/` running on a home server and exposed through ngrok, the Vercel site gets the schedule through it. Viewers then just open the site, on any device.
+
+1. Install the tools:
+   ```bash
+   sudo apt-get update && sudo apt-get install -y git curl
+   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs
+   curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+   echo "deb https://ngrok-agent.s3.amazonaws.com bookworm main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+   sudo apt-get update && sudo apt-get install -y ngrok
+   sudo npm install -g pm2
+   ```
+2. Log in to ngrok once. Get the token from dashboard.ngrok.com → **Your Authtoken**, and never commit it:
+   ```bash
+   ngrok config add-authtoken <your-token>
+   ```
+3. Get the code and start the proxy:
+   ```bash
+   git clone https://github.com/paichanut/onhockey.git ~/onhockey   # or: cd ~/onhockey && git pull
+   cd ~/onhockey/proxy && npm install
+   pm2 start proxy-server.js --name onhockey-proxy
+   ```
+4. Start the tunnel. Use the static domain from dashboard.ngrok.com → **Domains** (each free account gets one):
+   ```bash
+   pm2 start "ngrok http --url=<your-domain>.ngrok-free.dev 3001" --name onhockey-tunnel
+   pm2 save && pm2 startup systemd   # then run the sudo command it prints
+   ```
+5. Point the site at your tunnel. The site's built-in default is `https://labouringly-pseudonational-yvonne.ngrok-free.dev`. If your domain is different, set `PROXY_URL=https://<your-domain>.ngrok-free.dev` in Vercel → Project → Settings → Environment Variables, then redeploy.
+6. Check each step (every count should be above 0):
+   ```bash
+   pm2 status                                                           # both "online"
+   curl -s localhost:3001/api/schedule_raw | grep -c "tr class='game'"  # proxy works
+   curl -s -H "ngrok-skip-browser-warning: 1" https://<your-domain>.ngrok-free.dev/api/schedule_raw | grep -c "tr class='game'"  # tunnel works
+   curl -s https://onhockey.vercel.app/api/schedule | grep -c "tr class='game'"   # live site works
+   ```
+
+**Troubleshooting**
+- `ERR_NGROK_3200`: the tunnel is offline. Check `pm2 logs onhockey-tunnel --lines 30 --nostream`.
+- "domain is not reserved" or similar: the domain belongs to a different ngrok account than the one logged in.
+- A free ngrok account runs one tunnel at a time, so stop ngrok on any other computer.
+- The proxy works but the live site doesn't: `PROXY_URL` (step 5) doesn't match your tunnel's address.
+
 ## How viewers use it
 
 Pick one, once:
