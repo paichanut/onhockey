@@ -36,15 +36,15 @@ const TIMEZONES = [
 
 const LEAGUE_FILTERS = [
   { value: 'NA', label: 'North America' },
-  { value: 'RU', label: 'RU/KZ/BY' },
+  { value: 'RU', label: 'Russia/KZ/BY' },
   { value: 'FI', label: 'Finland' },
   { value: 'SE', label: 'Sweden' },
-  { value: 'CZ', label: 'Czechia/Slovakia' },
-  { value: 'DK', label: 'DK/NO/IS' },
-  { value: 'CH', label: 'CH/DE/FR/NL/BE/LU' },
-  { value: 'AT', label: 'AT/IT/HU/RO/SI/HR/RS' },
-  { value: 'LV', label: 'Baltic/Poland/Ukraine' },
-  { value: 'OTH', label: 'UK and others' },
+  { value: 'CZ', label: 'Czech/Slovakia' },
+  { value: 'DK', label: 'Nordics' },
+  { value: 'CH', label: 'Swiss/Germany' },
+  { value: 'AT', label: 'Austria/Central' },
+  { value: 'LV', label: 'Baltic/Poland' },
+  { value: 'OTH', label: 'UK & others' },
   { value: 'INT', label: 'International' },
 ];
 
@@ -68,7 +68,47 @@ function HlsVideo({ src }) {
     return () => hls?.destroy();
   }, [src]);
 
-  return <video ref={videoRef} style={styles.iframe} controls autoPlay />;
+  return <video ref={videoRef} controls autoPlay />;
+}
+
+function Player({ stream }) {
+  return (
+    <div className="player">
+      {!stream ? (
+        <div className="player-empty">
+          <div className="play-dot">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="#06101f" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+          </div>
+          Pick a game, then a stream
+        </div>
+      ) : stream.type === 'hls' ? (
+        <HlsVideo src={stream.url} />
+      ) : (
+        <iframe src={stream.url} title="Stream player" allowFullScreen allow="autoplay; encrypted-media; fullscreen" />
+      )}
+    </div>
+  );
+}
+
+const Chevron = () => (
+  <svg className="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+);
+
+const ExternalIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-label="opens in a new tab"><path d="M14 4h6v6" /><path d="M20 4l-9 9" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>
+);
+
+// Below this width the player opens inside the game's drop-down instead of beside the list.
+function useNarrow() {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 900px)');
+    const update = () => setNarrow(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  return narrow;
 }
 
 export default function Home() {
@@ -77,11 +117,11 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [needsExtension, setNeedsExtension] = useState(false);
   const bookmarkletRef = useRef(null);
-  const [selectedGame, setSelectedGame] = useState(null);
-  const [stream, setStream] = useState(null);
+  const [openKey, setOpenKey] = useState(null);
+  const [playing, setPlaying] = useState(null); // { key, linkUrl, linkName, stream }
   const [timezone, setTimezone] = useState('07');
   const [filters, setFilters] = useState([]);
-  const [showAll, setShowAll] = useState(true);
+  const narrow = useNarrow();
 
   const fetchSchedule = async () => {
     setLoading(true);
@@ -94,7 +134,7 @@ export default function Home() {
       } else if (openedByBookmarklet()) {
         html = await fetchScheduleViaBookmarklet();
       } else {
-        // Without the extension, try the server relay (works only while the home proxy runs).
+        // Without the extension, the server relay works while the home proxy runs.
         const response = await fetch('/api/schedule', { cache: 'no-store' });
         if (!response.ok) {
           setNeedsExtension(true);
@@ -126,485 +166,185 @@ export default function Home() {
     if (bookmarkletCode) bookmarkletRef.current?.setAttribute('href', bookmarkletCode);
   }, [needsExtension, bookmarkletCode]);
 
-  const handleStreamClick = (link) => {
-    const resolved = resolveStream(link.url);
-    if (resolved.type === 'external') {
-      window.open(resolved.url, '_blank', 'noopener');
-    } else {
-      setStream(resolved);
+  const playLink = (key, game, league, link) => {
+    const stream = resolveStream(link.url);
+    if (stream.type === 'external') {
+      window.open(stream.url, '_blank', 'noopener');
+      return;
     }
+    setPlaying({ key, linkUrl: link.url, linkName: link.name, teams: game.teams, league: league.name, hour: game.hour, minutes: game.minutes, stream });
   };
 
   const toggleFilter = (value) => {
-    if (value === 'showAll') {
-      setShowAll(!showAll);
-      setFilters([]);
-    } else {
-      setShowAll(false);
-      if (filters.includes(value)) {
-        setFilters(filters.filter((f) => f !== value));
-      } else {
-        setFilters([...filters, value]);
-      }
-    }
+    setFilters(filters.includes(value) ? filters.filter((f) => f !== value) : [...filters, value]);
   };
 
-  const filteredLeagues = leagues.filter((league) => {
-    if (showAll) return true;
-    if (filters.length === 0) return true;
-    return filters.includes(league.class);
-  });
+  // Keys come from each game's position in the full schedule, so filtering keeps them stable.
+  const keyed = leagues.map((league, li) => ({
+    ...league,
+    games: league.games.map((game, gi) => ({ ...game, key: `${li}-${gi}` })),
+  }));
+  const shown = filters.length ? keyed.filter((league) => filters.includes(league.class)) : keyed;
+  const liveCount = leagues.reduce((n, l) => n + l.games.filter((g) => g.isLive).length, 0);
+  const time = (g) => `${shiftHour(g.hour, timezone)}:${g.minutes}`;
 
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
-        <h1 style={styles.title}>🏒 OnHockey Live</h1>
-        <p style={styles.subtitle}>Ice hockey streams - No ads</p>
+    <>
+      <header className="bar">
+        <div className="wrap bar-top">
+          <div className="brand">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 4l9 12" /><path d="M13 16h5" /><ellipse cx="18" cy="19" rx="3" ry="1.4" /></svg>
+            <p className="logo">OnHockey <span>Live</span></p>
+            {leagues.length > 0 && (
+              <span className="pill">
+                Ad-free · {leagues.length} leagues{liveCount ? ` · ${liveCount} live` : ''}
+              </span>
+            )}
+          </div>
+          <label className="tz">
+            <span className="tz-label">Time zone</span>
+            <select value={timezone} onChange={(e) => setTimezone(e.target.value)}>
+              {TIMEZONES.map((tz) => (
+                <option key={tz.value} value={tz.value}>{tz.label}</option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="btn-primary" onClick={fetchSchedule} disabled={loading}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
+            {loading ? 'Loading…' : 'Refresh'}
+          </button>
+        </div>
+        <nav className="wrap chips" aria-label="Filter leagues by region">
+          <button type="button" className="chip" aria-pressed={filters.length === 0} onClick={() => setFilters([])}>All</button>
+          {LEAGUE_FILTERS.map((f) => (
+            <button key={f.value} type="button" className="chip" aria-pressed={filters.includes(f.value)} onClick={() => toggleFilter(f.value)}>
+              {f.label}
+            </button>
+          ))}
+        </nav>
       </header>
 
-      <div style={styles.controls}>
-        <div style={styles.controlGroup}>
-          <label style={styles.label}>Timezone:</label>
-          <select
-            value={timezone}
-            onChange={(e) => setTimezone(e.target.value)}
-            style={styles.select}
-          >
-            {TIMEZONES.map((tz) => (
-              <option key={tz.value} value={tz.value}>
-                {tz.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <button onClick={fetchSchedule} style={styles.refreshBtn} disabled={loading}>
-          {loading ? 'Loading...' : '🔄 Refresh Schedule'}
-        </button>
-      </div>
-
-      <div style={styles.filters}>
-        <label style={styles.filterLabel}>
-          <input
-            type="checkbox"
-            checked={showAll}
-            onChange={() => toggleFilter('showAll')}
-          />
-          {' '}ALL
-        </label>
-        {LEAGUE_FILTERS.map((filter) => (
-          <label key={filter.value} style={styles.filterLabel}>
-            <input
-              type="checkbox"
-              checked={filters.includes(filter.value)}
-              onChange={() => toggleFilter(filter.value)}
-            />
-            {' '}{filter.label}
-          </label>
-        ))}
-      </div>
-
-      <div style={styles.main}>
-        {stream && (
-          <div style={styles.player}>
-            <div style={styles.playerHeader}>
-              <h3 style={styles.playerTitle}>{selectedGame?.teams}</h3>
-              <button onClick={() => setStream(null)} style={styles.closeBtn}>
-                ✕
-              </button>
-            </div>
-            {stream.type === 'hls' ? (
-              <HlsVideo src={stream.url} />
-            ) : (
-              <iframe
-                src={stream.url}
-                style={styles.iframe}
-                allowFullScreen
-                allow="autoplay; encrypted-media; fullscreen"
-              />
-            )}
-          </div>
-        )}
-
-        {selectedGame && (
-          <div style={styles.linksPanel}>
-            <h3 style={styles.linksTitle}>Available Streams for: {selectedGame.teams}</h3>
-            {selectedGame.links.length === 0 ? (
-              <span style={styles.noLinks}>Stream available closer to game time</span>
-            ) : (
-              <div style={styles.linksGrid}>
-                {selectedGame.links.map((link, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleStreamClick(link)}
-                    style={styles.linkBtn}
-                  >
-                    {link.name}
-                    {(link.language || link.title) && (
-                      <span style={styles.linkTitle}>
-                        {[link.language, link.title].filter(Boolean).join(' · ')}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div style={styles.schedule}>
+      <main className="wrap main">
+        <section className="schedule" aria-label="Schedule">
           {loading && !leagues.length ? (
-            <div style={styles.loading}>Loading schedule...</div>
+            <div className="empty">Loading schedule…</div>
           ) : needsExtension && !leagues.length ? (
-            <div style={styles.install}>
-              <h3 style={styles.linksTitle}>One-time setup</h3>
-              <p style={styles.installText}>
-                onhockey.tv only shares its schedule with its own pages, so this site gets it through
-                your browser. Pick one:
+            <div className="setup">
+              <h2>One-time setup</h2>
+              <p style={{ margin: 0 }}>
+                onhockey.tv only shares its schedule with its own pages, so this site gets it through your
+                browser. Pick one:
               </p>
-              <h4 style={styles.installHeading}>Option 1: Bookmark (nothing to install)</h4>
-              <ol style={styles.installText}>
+              <h3>Option 1: Bookmark (nothing to install)</h3>
+              <ol>
                 <li>
                   Drag this button to your bookmarks bar:{' '}
-                  <a ref={bookmarkletRef} style={styles.bookmarklet} onClick={(e) => e.preventDefault()}>
-                    🏒 OnHockey Clean
-                  </a>
+                  <a ref={bookmarkletRef} className="bookmarklet" onClick={(e) => e.preventDefault()}>🏒 OnHockey Clean</a>
                 </li>
-                <li>Open <b>onhockey.tv</b> and click the bookmark. This clean page opens with the schedule.</li>
+                <li>Open <b>onhockey.tv</b> and click the bookmark. This page opens with the schedule.</li>
                 <li>Keep the onhockey.tv tab open in the background so Refresh keeps working.</li>
               </ol>
-              <details style={styles.installText}>
-                <summary>On a phone, or can't drag?</summary>
+              <details>
+                <summary>On a phone, or can&apos;t drag?</summary>
                 Bookmark any page, edit the bookmark, and replace its address with this code:
-                <textarea readOnly value={bookmarkletCode} style={styles.codeBox} onFocus={(e) => e.target.select()} />
-                Then open onhockey.tv and pick the bookmark (on Android Chrome, type its name in the
-                address bar and tap it).
+                <textarea readOnly value={bookmarkletCode} className="code" onFocus={(e) => e.target.select()} />
+                Then open onhockey.tv and pick the bookmark (on Android Chrome, type its name in the address
+                bar and tap it).
               </details>
-              <h4 style={styles.installHeading}>Option 2: Extension (Chrome or Edge on a computer)</h4>
-              <ol style={styles.installText}>
-                <li>
-                  <a href="/onhockey-extension.zip" style={styles.installLink}>Download the extension</a>{' '}
-                  and unzip it.
-                </li>
+              <h3>Option 2: Extension (Chrome or Edge on a computer)</h3>
+              <ol>
+                <li><a href="/onhockey-extension.zip">Download the extension</a> and unzip it.</li>
                 <li>Open <code>chrome://extensions</code> (or <code>edge://extensions</code>).</li>
                 <li>Turn on <b>Developer mode</b>, click <b>Load unpacked</b>, and pick the unzipped folder.</li>
                 <li>Refresh this page. From then on, just open this site.</li>
               </ol>
             </div>
           ) : error && !leagues.length ? (
-            <div style={styles.loading}>Could not load schedule: {error}</div>
-          ) : filteredLeagues.length === 0 ? (
-            <div style={styles.loading}>No games found for selected filters</div>
+            <div className="empty">Could not load the schedule: {error}</div>
+          ) : shown.length === 0 ? (
+            <div className="empty">No games for the selected regions.</div>
           ) : (
-            filteredLeagues.map((league, leagueIndex) => (
-              <div key={leagueIndex} style={styles.league}>
-                <div style={styles.leagueHeader}>
-                  <h2 style={styles.leagueName}>{league.name}</h2>
+            shown.map((league) => (
+              <div key={league.games[0]?.key ?? league.name} className="league">
+                <div className="league-head">
+                  <h2>{league.name}</h2>
+                  <span>{league.games.length} {league.games.length === 1 ? 'game' : 'games'}</span>
                 </div>
-                {league.games.map((game, gameIndex) => {
-                  const isSelected = selectedGame === game;
-
+                {league.games.map((game) => {
+                  const isOpen = openKey === game.key;
+                  const dropId = `drop-${game.key}`;
                   return (
-                    <div
-                      key={gameIndex}
-                      onClick={() => {
-                        setSelectedGame(game);
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                      style={{
-                        ...styles.gameRow,
-                        ...(isSelected ? styles.gameRowSelected : {}),
-                      }}
-                    >
-                      <div style={styles.gameTime}>
-                        {shiftHour(game.hour, timezone)}:{game.minutes}
-                      </div>
-                      <div style={styles.gameTeams}>
-                        {game.teams}
-                        {game.isLive && (
-                          <span style={styles.liveBadge}>
-                            🔴 {game.liveCount} LIVE
-                          </span>
-                        )}
-                      </div>
-                      <div style={styles.gameStatus}>
-                        {game.links.length > 0 ? (
-                          <span style={styles.hasLinks}>📺 Click for links</span>
-                        ) : (
-                          <span style={styles.noLinks}>
-                            Stream available closer to game time
-                          </span>
-                        )}
-                      </div>
+                    <div key={game.key} className={isOpen ? 'game is-open' : 'game'}>
+                      <button
+                        type="button"
+                        className="game-row"
+                        aria-expanded={isOpen}
+                        aria-controls={dropId}
+                        onClick={() => setOpenKey(isOpen ? null : game.key)}
+                      >
+                        <span className="game-time">{time(game)}</span>
+                        <span className="game-teams">{game.teams}</span>
+                        {game.isLive && <span className="live">LIVE{game.liveCount ? ` ${game.liveCount}` : ''}</span>}
+                        <span className={game.links.length ? 'game-links' : 'game-links soon'}>
+                          {game.links.length ? `${game.links.length} links` : 'Soon'}
+                        </span>
+                        <Chevron />
+                      </button>
+                      {isOpen && (
+                        <div className="drop" id={dropId}>
+                          {narrow && playing?.key === game.key && <Player stream={playing.stream} />}
+                          {game.links.length ? (
+                            <div className="streams">
+                              {game.links.map((link, i) => {
+                                const external = resolveStream(link.url).type === 'external';
+                                const on = playing?.key === game.key && playing.linkUrl === link.url;
+                                return (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    className="stream"
+                                    aria-pressed={on}
+                                    onClick={() => playLink(game.key, game, league, link)}
+                                  >
+                                    <b>{link.name}{external && <ExternalIcon />}</b>
+                                    {(link.language || (link.title && !external)) && (
+                                      <small>{[link.language, external ? '' : link.title].filter(Boolean).join(' · ')}</small>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="note">Stream links appear closer to game time. Press Refresh then.</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
             ))
           )}
-        </div>
-      </div>
-    </div>
+        </section>
+
+        <aside className="watch" aria-label="Now watching">
+          {!narrow && <Player stream={playing?.stream} />}
+          <div className="now">
+            <div>
+              <div className="now-meta">
+                {playing ? `${playing.league} · ${shiftHour(playing.hour, timezone)}:${playing.minutes}` : 'Nothing playing'}
+              </div>
+              <h1>{playing ? playing.teams : 'Pick a game'}</h1>
+            </div>
+            {playing && (
+              <button type="button" className="btn-ghost" onClick={() => setPlaying(null)}>
+                Stop · {playing.linkName}
+              </button>
+            )}
+          </div>
+          <p className="note">The player stays here while you browse. Clicking a game opens its links right under it.</p>
+        </aside>
+      </main>
+    </>
   );
 }
-
-const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#0a0a0a',
-    color: '#ffffff',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  },
-  header: {
-    padding: '20px 30px',
-    borderBottom: '1px solid #333',
-    backgroundColor: '#111',
-  },
-  title: {
-    margin: 0,
-    fontSize: '28px',
-    fontWeight: 'bold',
-  },
-  subtitle: {
-    margin: '5px 0 0',
-    fontSize: '14px',
-    color: '#888',
-  },
-  controls: {
-    display: 'flex',
-    gap: '15px',
-    padding: '15px 30px',
-    backgroundColor: '#161616',
-    borderBottom: '1px solid #222',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  controlGroup: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-  },
-  label: {
-    fontSize: '14px',
-    color: '#aaa',
-  },
-  select: {
-    padding: '8px 12px',
-    backgroundColor: '#222',
-    color: '#fff',
-    border: '1px solid #444',
-    borderRadius: '4px',
-    fontSize: '14px',
-    cursor: 'pointer',
-  },
-  refreshBtn: {
-    padding: '8px 16px',
-    backgroundColor: '#0066cc',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    transition: 'background-color 0.2s',
-  },
-  filters: {
-    display: 'flex',
-    gap: '15px',
-    padding: '12px 30px',
-    backgroundColor: '#1a1a1a',
-    borderBottom: '1px solid #222',
-    flexWrap: 'wrap',
-  },
-  filterLabel: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '5px',
-    fontSize: '13px',
-    color: '#aaa',
-    cursor: 'pointer',
-  },
-  main: {
-    display: 'flex',
-    flexDirection: 'column',
-    maxWidth: '1400px',
-    margin: '0 auto',
-    padding: '20px',
-    gap: '20px',
-  },
-  player: {
-    backgroundColor: '#111',
-    borderRadius: '8px',
-    overflow: 'hidden',
-    border: '1px solid #333',
-  },
-  playerHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '15px 20px',
-    backgroundColor: '#1a1a1a',
-    borderBottom: '1px solid #333',
-  },
-  playerTitle: {
-    margin: 0,
-    fontSize: '16px',
-    fontWeight: '600',
-  },
-  closeBtn: {
-    padding: '6px 12px',
-    backgroundColor: '#333',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '14px',
-  },
-  iframe: {
-    width: '100%',
-    height: '500px',
-    border: 'none',
-  },
-  schedule: {
-    flex: 1,
-  },
-  loading: {
-    textAlign: 'center',
-    padding: '40px',
-    color: '#888',
-    fontSize: '16px',
-  },
-  league: {
-    marginBottom: '20px',
-  },
-  leagueHeader: {
-    backgroundColor: '#8B0000',
-    padding: '10px 15px',
-    borderRadius: '6px 6px 0 0',
-  },
-  leagueName: {
-    margin: 0,
-    fontSize: '16px',
-    fontWeight: '600',
-  },
-  gameRow: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: '12px 15px',
-    borderBottom: '1px solid #222',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
-    backgroundColor: '#0a0a0a',
-  },
-  gameRowSelected: {
-    backgroundColor: '#1a2a3a',
-    borderLeft: '3px solid #0066cc',
-  },
-  gameTime: {
-    width: '60px',
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#ff9800',
-  },
-  gameTeams: {
-    flex: 1,
-    fontSize: '14px',
-    fontWeight: '500',
-  },
-  gameStatus: {
-    fontSize: '12px',
-    color: '#888',
-  },
-  hasLinks: {
-    color: '#4caf50',
-    fontWeight: '500',
-  },
-  noLinks: {
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  liveBadge: {
-    display: 'inline-block',
-    marginLeft: '8px',
-    padding: '2px 8px',
-    backgroundColor: '#cc0000',
-    borderRadius: '3px',
-    fontSize: '11px',
-    fontWeight: 'bold',
-  },
-  linksPanel: {
-    backgroundColor: '#111',
-    padding: '20px',
-    borderRadius: '8px',
-    border: '1px solid #333',
-  },
-  linksTitle: {
-    margin: '0 0 15px',
-    fontSize: '16px',
-    fontWeight: '600',
-  },
-  linksGrid: {
-    display: 'flex',
-    gap: '10px',
-    flexWrap: 'wrap',
-  },
-  linkBtn: {
-    padding: '10px 20px',
-    backgroundColor: '#0066cc',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    transition: 'background-color 0.2s',
-  },
-  install: {
-    maxWidth: '640px',
-    margin: '40px auto',
-    padding: '20px 24px',
-    backgroundColor: '#111',
-    border: '1px solid #333',
-    borderRadius: '8px',
-  },
-  installText: {
-    color: '#ccc',
-    fontSize: '14px',
-    lineHeight: 1.6,
-  },
-  installHeading: {
-    margin: '20px 0 4px',
-    fontSize: '14px',
-    color: '#fff',
-  },
-  bookmarklet: {
-    display: 'inline-block',
-    padding: '6px 12px',
-    backgroundColor: '#0066cc',
-    color: '#fff',
-    borderRadius: '4px',
-    textDecoration: 'none',
-    cursor: 'grab',
-  },
-  codeBox: {
-    display: 'block',
-    width: '100%',
-    height: '90px',
-    margin: '8px 0',
-    backgroundColor: '#000',
-    color: '#9cf',
-    border: '1px solid #333',
-    fontSize: '11px',
-    fontFamily: 'monospace',
-  },
-  installLink: {
-    color: '#4da3ff',
-  },
-  linkTitle: {
-    fontSize: '11px',
-    opacity: 0.8,
-  },
-};
