@@ -9,7 +9,7 @@ import {
   fetchScheduleViaExtension,
   openedByBookmarklet,
   fetchScheduleViaBookmarklet,
-  BOOKMARKLET,
+  bookmarklet,
 } from '@/lib/onhockey';
 
 const TIMEZONES = [
@@ -115,10 +115,16 @@ export default function Home() {
     fetchSchedule();
   }, []);
 
+  // The bookmarklet points back at whichever deployment is serving this page.
+  const [bookmarkletCode, setBookmarkletCode] = useState('');
+  useEffect(() => {
+    setBookmarkletCode(bookmarklet(window.location.origin));
+  }, []);
+
   // React blocks javascript: URLs in href, so set the bookmarklet's address directly.
   useEffect(() => {
-    bookmarkletRef.current?.setAttribute('href', BOOKMARKLET);
-  }, [needsExtension]);
+    if (bookmarkletCode) bookmarkletRef.current?.setAttribute('href', bookmarkletCode);
+  }, [needsExtension, bookmarkletCode]);
 
   const handleStreamClick = (link) => {
     const resolved = resolveStream(link.url);
@@ -270,7 +276,7 @@ export default function Home() {
               <details style={styles.installText}>
                 <summary>On a phone, or can't drag?</summary>
                 Bookmark any page, edit the bookmark, and replace its address with this code:
-                <textarea readOnly value={BOOKMARKLET} style={styles.codeBox} onFocus={(e) => e.target.select()} />
+                <textarea readOnly value={bookmarkletCode} style={styles.codeBox} onFocus={(e) => e.target.select()} />
                 Then open onhockey.tv and pick the bookmark (on Android Chrome, type its name in the
                 address bar and tap it).
               </details>
