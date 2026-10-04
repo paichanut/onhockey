@@ -209,13 +209,31 @@ export default function Home() {
     games: league.games.map((game, gi) => ({ ...game, key: `${li}-${gi}` })),
   }));
   const shown = filters.length ? keyed.filter((league) => filters.includes(league.class)) : keyed;
-  // Only streams that are live right now; past and upcoming ones stay on YouTube.
-  const shownChannels = (!filters.length || filters.includes('TH') ? channels : []).map((c) => ({
-    ...c,
-    videos: c.videos.filter((v) => v.status === 'live'),
-  }));
+  // Only streams that are live now or scheduled (not ones whose start passed hours ago);
+  // a channel with neither is hidden entirely.
+  const now = Date.now();
+  const shownChannels = (!filters.length || filters.includes('TH') ? channels : [])
+    .map((c) => ({
+      ...c,
+      videos: c.videos
+        .filter((v) => v.status === 'live' || (v.status === 'upcoming' && (!v.startsAt || Date.parse(v.startsAt) > now - 6 * 3600e3)))
+        .sort((a, b) => (a.status === 'live' ? -1 : b.status === 'live' ? 1 : Date.parse(a.startsAt || 0) - Date.parse(b.startsAt || 0))),
+    }))
+    .filter((c) => c.videos.length > 0);
   const liveCount = leagues.reduce((n, l) => n + l.games.filter((g) => g.isLive).length, 0);
   const time = (g) => `${shiftHour(g.hour, timezone)}:${g.minutes}`;
+  // A scheduled YouTube start, shown in the selected time zone (e.g. "09:50" / "Tomorrow").
+  const startLabel = (iso) => {
+    const offset = parseInt(timezone, 10) * 3600e3;
+    const at = new Date(Date.parse(iso) + offset);
+    const today = new Date(now + offset);
+    const dayIndex = (d) => Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 86400e3);
+    const diff = dayIndex(at) - dayIndex(today);
+    const day = diff === 0 ? 'Today' : diff === 1 ? 'Tomorrow'
+      : `${at.getUTCDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][at.getUTCMonth()]}`;
+    const pad = (n) => String(n).padStart(2, '0');
+    return { time: `${pad(at.getUTCHours())}:${pad(at.getUTCMinutes())}`, day };
+  };
 
   return (
     <>
@@ -261,12 +279,6 @@ export default function Home() {
                 <h2>{channel.name}</h2>
                 <span>{channel.region} · YouTube</span>
               </div>
-              {channel.videos.length === 0 && (
-                <p className="note channel-idle">
-                  No live stream right now ·{' '}
-                  <a href={channel.url} target="_blank" rel="noopener noreferrer">Open channel</a>
-                </p>
-              )}
               {channel.videos.map((video) => {
                 const key = `yt-${ci}-${video.id}`;
                 const isOpen = openKey === key;
@@ -280,14 +292,30 @@ export default function Home() {
                       aria-controls={`drop-${key}`}
                       onClick={() => setOpenKey(isOpen ? null : key)}
                     >
-                      <span className="game-time yt"><span className="live">LIVE</span></span>
+                      <span className="game-time yt">
+                        {video.status === 'live' ? (
+                          <span className="live">LIVE</span>
+                        ) : video.startsAt ? (
+                          <>
+                            <b className="yt-clock">{startLabel(video.startsAt).time}</b>
+                            <small>{startLabel(video.startsAt).day}</small>
+                          </>
+                        ) : (
+                          'Soon'
+                        )}
+                      </span>
                       <span className="game-teams">{video.title}</span>
-                      {video.when && <span className="game-links soon">{video.when}</span>}
+                      <span className="game-links soon">{video.status === 'live' ? video.when : 'Scheduled'}</span>
                       <Chevron />
                     </button>
                     {isOpen && (
                       <div className="drop" id={`drop-${key}`}>
                         {narrow && on && <Player stream={playing.stream} />}
+                        {video.status === 'upcoming' && video.startsAt && (
+                          <p className="note">
+                            Starts {startLabel(video.startsAt).day} at {startLabel(video.startsAt).time}
+                          </p>
+                        )}
                         <div className="streams">
                           <button type="button" className="stream" aria-pressed={on} onClick={() => playVideo(key, channel, video)}>
                             <b>Watch here</b>
