@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
+import { track } from '@vercel/analytics';
 import {
   parseSchedule,
   resolveStream,
@@ -186,9 +187,11 @@ export default function Home() {
       return;
     }
     setPlaying({ key, linkUrl: link.url, linkName: link.name, teams: game.teams, league: league.name, hour: game.hour, minutes: game.minutes, stream });
+    track('Play', { league: league.name, game: game.teams, source: link.name });
   };
 
   const playVideo = (key, channel, video) => {
+    track('Play', { league: channel.name, game: video.title.slice(0, 100), source: 'YouTube' });
     setPlaying({
       key,
       linkUrl: video.id,
