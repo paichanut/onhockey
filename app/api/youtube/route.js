@@ -4,6 +4,7 @@ import { fetchChannelStreams } from '@/lib/youtube';
 const CHANNELS = [
   { handle: '@icehockeyfamily', region: 'Thailand' },
   { handle: '@ICEAGETHAILANDCHANNEL', region: 'Thailand' },
+  { handle: '@Thatritorn', region: 'Thailand' },
 ];
 
 export async function GET() {
