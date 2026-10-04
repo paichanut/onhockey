@@ -1,7 +1,10 @@
 import { fetchChannelStreams } from '@/lib/youtube';
 
 // YouTube channels shown alongside the onhockey.tv schedule.
-const CHANNELS = [{ handle: '@icehockeyfamily', region: 'Thailand' }];
+const CHANNELS = [
+  { handle: '@icehockeyfamily', region: 'Thailand' },
+  { handle: '@ICEAGETHAILANDCHANNEL', region: 'Thailand' },
+];
 
 export async function GET() {
   const channels = await Promise.all(
