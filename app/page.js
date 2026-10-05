@@ -185,6 +185,12 @@ export default function Home() {
     if (bookmarkletCode) bookmarkletRef.current?.setAttribute('href', bookmarkletCode);
   }, [needsExtension, bookmarkletCode]);
 
+  // Sends a play to both Vercel Analytics and Google Analytics (gtag is loaded in layout.js).
+  const trackPlay = (props) => {
+    track('Play', props);
+    window.gtag?.('event', 'play', props);
+  };
+
   const playLink = (key, game, league, link) => {
     const stream = resolveStream(link.url);
     if (stream.type === 'external') {
@@ -192,11 +198,11 @@ export default function Home() {
       return;
     }
     setPlaying({ key, linkUrl: link.url, linkName: link.name, teams: game.teams, league: league.name, hour: game.hour, minutes: game.minutes, stream });
-    track('Play', { league: league.name, game: game.teams, source: link.name });
+    trackPlay({ league: league.name, game: game.teams, source: link.name });
   };
 
   const playVideo = (key, channel, video) => {
-    track('Play', { league: channel.name, game: video.title.slice(0, 100), source: 'YouTube' });
+    trackPlay({ league: channel.name, game: video.title.slice(0, 100), source: 'YouTube' });
     setPlaying({
       key,
       linkUrl: video.id,
