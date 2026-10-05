@@ -1,5 +1,5 @@
-import Script from 'next/script';
 import { Analytics } from '@vercel/analytics/next';
+import Consent from './consent';
 import './globals.css';
 
 export const metadata = {
@@ -23,13 +23,7 @@ export default function RootLayout({ children }) {
       <body>
         {children}
         <Analytics />
-        <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
-        <Script id="ga-init" strategy="afterInteractive">
-          {`window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', '${GA_ID}');`}
-        </Script>
+        <Consent gaId={GA_ID} />
       </body>
     </html>
   );
