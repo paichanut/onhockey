@@ -5,15 +5,17 @@ const CHANNELS = [
   { handle: '@icehockeyfamily', region: 'Thailand' },
   { handle: '@ICEAGETHAILANDCHANNEL', region: 'Thailand' },
   { handle: '@Thatritorn', region: 'Thailand' },
+  { handle: '@ljfilmsports', region: 'Korea', name: 'LJ Film Sports' },
 ];
 
 export async function GET() {
   const channels = await Promise.all(
     CHANNELS.map(async (c) => {
       try {
-        return { ...(await fetchChannelStreams(c.handle)), region: c.region };
+        const result = await fetchChannelStreams(c.handle);
+        return { ...result, name: c.name || result.name, region: c.region };
       } catch (err) {
-        return { name: c.handle, url: `https://www.youtube.com/${c.handle}`, region: c.region, videos: [], error: err.message };
+        return { name: c.name || c.handle, url: `https://www.youtube.com/${c.handle}`, region: c.region, videos: [], error: err.message };
       }
     })
   );
