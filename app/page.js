@@ -208,7 +208,7 @@ export default function Home() {
       linkUrl: video.id,
       linkName: 'YouTube',
       teams: video.title,
-      metaText: `${channel.name} · YouTube`,
+      metaText: 'YouTube Live',
       stream: { type: 'iframe', url: `https://www.youtube.com/embed/${video.id}?autoplay=1` },
     });
   };
@@ -223,18 +223,17 @@ export default function Home() {
     games: league.games.map((game, gi) => ({ ...game, key: `${li}-${gi}` })),
   }));
   const shown = filters.length ? keyed.filter((league) => filters.includes(league.class)) : keyed;
-  // Only streams that are live now or scheduled (not ones whose start passed hours ago);
-  // a channel with neither is hidden entirely.
+  // All channels' streams merged into one "YouTube Live" card: live now first, then by start time.
+  // Only streams that are live or scheduled (not ones whose start passed hours ago).
   const now = Date.now();
-  const shownChannels = channels
+  const startOf = (v) => (v.status === 'live' ? -Infinity : v.startsAt ? Date.parse(v.startsAt) : Infinity);
+  const ytVideos = channels
     .filter((c) => !filters.length || filters.includes(CHANNEL_REGION_FILTER[c.region]))
-    .map((c) => ({
-      ...c,
-      videos: c.videos
-        .filter((v) => v.status === 'live' || (v.status === 'upcoming' && (!v.startsAt || Date.parse(v.startsAt) > now - 6 * 3600e3)))
-        .sort((a, b) => (a.status === 'live' ? -1 : b.status === 'live' ? 1 : Date.parse(a.startsAt || 0) - Date.parse(b.startsAt || 0))),
-    }))
-    .filter((c) => c.videos.length > 0);
+    .flatMap((c) => c.videos.map((v) => ({ ...v, channel: c })))
+    .filter((v) => v.status === 'live' || (v.status === 'upcoming' && (!v.startsAt || Date.parse(v.startsAt) > now - 6 * 3600e3)))
+    .filter((v, i, all) => all.findIndex((o) => o.id === v.id) === i)
+    .sort((a, b) => startOf(a) - startOf(b));
+  const ytLive = ytVideos.filter((v) => v.status === 'live').length;
   const liveCount = leagues.reduce((n, l) => n + l.games.filter((g) => g.isLive).length, 0);
   const time = (g) => `${shiftHour(g.hour, timezone)}:${g.minutes}`;
   // A scheduled YouTube start, shown in the selected time zone (e.g. "09:50" / "Tomorrow").
@@ -288,14 +287,14 @@ export default function Home() {
 
       <main className="wrap main">
         <section className="schedule" aria-label="Schedule">
-          {shownChannels.map((channel, ci) => (
-            <div key={channel.url} className="league">
+          {ytVideos.length > 0 && (
+            <div className="league">
               <div className="league-head">
-                <h2>{channel.name}</h2>
-                <span>{channel.region} · YouTube</span>
+                <h2>YouTube Live</h2>
+                <span>{[ytLive && `${ytLive} live`, ytVideos.length - ytLive && `${ytVideos.length - ytLive} scheduled`].filter(Boolean).join(' · ')}</span>
               </div>
-              {channel.videos.map((video) => {
-                const key = `yt-${ci}-${video.id}`;
+              {ytVideos.map((video) => {
+                const key = `yt-${video.id}`;
                 const isOpen = openKey === key;
                 const on = playing?.key === key;
                 return (
@@ -332,13 +331,13 @@ export default function Home() {
                           </p>
                         )}
                         <div className="streams">
-                          <button type="button" className="stream" aria-pressed={on} onClick={() => playVideo(key, channel, video)}>
+                          <button type="button" className="stream" aria-pressed={on} onClick={() => playVideo(key, video.channel, video)}>
                             <b>Watch here</b>
                             <small>YouTube</small>
                           </button>
                           <a className="stream" href={`https://www.youtube.com/watch?v=${video.id}`} target="_blank" rel="noopener noreferrer">
                             <b>Open on YouTube<ExternalIcon /></b>
-                            <small>{channel.name}</small>
+                            <small>New tab</small>
                           </a>
                         </div>
                       </div>
@@ -347,7 +346,7 @@ export default function Home() {
                 );
               })}
             </div>
-          ))}
+          )}
           {loading && !leagues.length ? (
             <div className="empty">Loading schedule…</div>
           ) : needsExtension && !leagues.length ? (
@@ -383,7 +382,7 @@ export default function Home() {
             </div>
           ) : error && !leagues.length ? (
             <div className="empty">Could not load the schedule: {error}</div>
-          ) : shown.length === 0 && shownChannels.length === 0 ? (
+          ) : shown.length === 0 && ytVideos.length === 0 ? (
             <div className="empty">No games for the selected regions.</div>
           ) : (
             shown.map((league) => (
