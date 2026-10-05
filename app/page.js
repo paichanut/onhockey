@@ -48,7 +48,11 @@ const LEAGUE_FILTERS = [
   { value: 'OTH', label: 'UK & others' },
   { value: 'INT', label: 'International' },
   { value: 'TH', label: 'Thailand' },
+  { value: 'KR', label: 'Korea' },
 ];
+
+// Region filter chip for each YouTube channel's region.
+const CHANNEL_REGION_FILTER = { Thailand: 'TH', Korea: 'KR' };
 
 // Plays .m3u8 streams: natively in Safari, via hls.js everywhere else.
 function HlsVideo({ src }) {
@@ -215,7 +219,8 @@ export default function Home() {
   // Only streams that are live now or scheduled (not ones whose start passed hours ago);
   // a channel with neither is hidden entirely.
   const now = Date.now();
-  const shownChannels = (!filters.length || filters.includes('TH') ? channels : [])
+  const shownChannels = channels
+    .filter((c) => !filters.length || filters.includes(CHANNEL_REGION_FILTER[c.region]))
     .map((c) => ({
       ...c,
       videos: c.videos
