@@ -6,6 +6,7 @@ const CHANNELS = [
   { handle: '@ICEAGETHAILANDCHANNEL', region: 'Thailand' },
   { handle: '@Thatritorn', region: 'Thailand' },
   { handle: '@ljfilmsports', region: 'Korea', name: 'LJ Film Sports' },
+  { handle: '@unproanchor', region: 'Taiwan', name: 'Unpro Hockey Live' },
 ];
 
 export async function GET() {
