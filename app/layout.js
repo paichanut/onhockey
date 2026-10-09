@@ -1,5 +1,5 @@
 import { Analytics } from '@vercel/analytics/next';
-import Consent from './consent';
+import GoogleAnalytics from './google-analytics';
 import './globals.css';
 
 export const metadata = {
@@ -23,7 +23,12 @@ export default function RootLayout({ children }) {
       <body>
         {children}
         <Analytics />
-        <Consent gaId={GA_ID} />
+        <footer className="wrap site-foot">
+          <a className="link-btn" href="/onhockey-tv.apk" download>
+            Android / Google TV app
+          </a>
+        </footer>
+        <GoogleAnalytics gaId={GA_ID} />
       </body>
     </html>
   );
