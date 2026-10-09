@@ -12,6 +12,7 @@ import {
   fetchScheduleViaBookmarklet,
   bookmarklet,
 } from '@/lib/onhockey';
+import { hasTvApp, fetchScheduleViaTvApp, useTvRemote } from '@/lib/tv';
 
 const TIMEZONES = [
   { value: '-08', label: 'Anchorage (AKDT/GMT-8)' },
@@ -132,6 +133,15 @@ export default function Home() {
   const [channels, setChannels] = useState([]);
   const narrow = useNarrow();
 
+  // TV remote: Back closes the open game before the app goes back or exits.
+  useTvRemote(() => {
+    if (!openKey) return false;
+    const row = document.querySelector(`[aria-controls="drop-${openKey}"]`);
+    setOpenKey(null);
+    row?.focus();
+    return true;
+  });
+
   // YouTube channels (e.g. Thai ice hockey) load independently of the onhockey.tv schedule.
   const fetchChannels = async () => {
     try {
@@ -149,7 +159,15 @@ export default function Home() {
 
     try {
       let html;
-      if (hasExtension()) {
+      if (hasTvApp()) {
+        // The TV app fetches onhockey.tv natively from the viewer's own connection.
+        html = await fetchScheduleViaTvApp().catch(async (err) => {
+          console.warn('TV app fetch failed, trying the relay:', err);
+          const response = await fetch('/api/schedule', { cache: 'no-store' });
+          if (!response.ok) throw err;
+          return response.text();
+        });
+      } else if (hasExtension()) {
         html = await fetchScheduleViaExtension();
       } else if (openedByBookmarklet()) {
         html = await fetchScheduleViaBookmarklet();
@@ -461,9 +479,18 @@ export default function Home() {
               <h1>{playing ? playing.teams : 'Pick a game'}</h1>
             </div>
             {playing && (
-              <button type="button" className="btn-ghost" onClick={() => setPlaying(null)}>
-                Stop · {playing.linkName}
-              </button>
+              <div className="now-actions">
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => document.querySelector('.watch .player')?.requestFullscreen?.()}
+                >
+                  Fullscreen
+                </button>
+                <button type="button" className="btn-ghost" onClick={() => setPlaying(null)}>
+                  Stop · {playing.linkName}
+                </button>
+              </div>
             )}
           </div>
           <p className="note">The player stays here while you browse. Clicking a game opens its links right under it.</p>

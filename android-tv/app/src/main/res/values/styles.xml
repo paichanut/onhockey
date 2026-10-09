@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@color/rink</item>
+        <item name="android:colorPrimary">@color/rink</item>
+        <item name="android:colorAccent">@color/ice</item>
+    </style>
+    <color name="rink">#0B1220</color>
+    <color name="ice">#5CC8FF</color>
+</resources>
