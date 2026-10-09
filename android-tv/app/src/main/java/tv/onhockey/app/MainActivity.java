@@ -2,6 +2,15 @@ package tv.onhockey.app;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.PendingIntent;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
+import android.content.pm.PackageInstaller;
+import android.net.Uri;
+import android.os.Build;
+import android.provider.Settings;
+import android.widget.Toast;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.KeyEvent;
@@ -20,6 +29,7 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.regex.Matcher;
@@ -31,6 +41,9 @@ import java.util.regex.Pattern;
  */
 public class MainActivity extends Activity {
     private static final String APP_URL = "https://onhockey.vercel.app/?tv=1";
+    private static final String VERSION_URL = "https://onhockey.vercel.app/tv-version.json";
+    private static final String APK_URL = "https://onhockey.vercel.app/onhockey-tv.apk";
+    private static final String ACTION_INSTALL_STATUS = "tv.onhockey.app.INSTALL_STATUS";
     private static final String SCHEDULE_URL = "https://onhockey.tv/schedule_table.php";
     private static final String USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -41,6 +54,7 @@ public class MainActivity extends Activity {
     private View fullscreenView;
     private WebChromeClient.CustomViewCallback fullscreenCallback;
     private WebChromeClient chrome;
+    private boolean updateAfterPermission;
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override
@@ -66,8 +80,11 @@ public class MainActivity extends Activity {
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri url = request.getUrl();
+                // YouTube goes to the YouTube app; it plays far better there than in a WebView.
+                if (request.isForMainFrame() && isYouTube(url) && openExternal(url)) return true;
                 // Stream pages open inside the app; app-store and intent:// links are ignored.
-                String scheme = request.getUrl().getScheme();
+                String scheme = url.getScheme();
                 return !"http".equals(scheme) && !"https".equals(scheme);
             }
         });
@@ -102,6 +119,101 @@ public class MainActivity extends Activity {
             web.loadUrl(APP_URL);
         }
         web.requestFocus();
+        checkForUpdate();
+    }
+
+    private static boolean isYouTube(Uri url) {
+        String host = url.getHost();
+        if (host == null) return false;
+        host = host.toLowerCase();
+        boolean youtube = host.equals("youtu.be") || host.equals("youtube.com") || host.endsWith(".youtube.com");
+        return youtube && (url.getPath() == null || !url.getPath().startsWith("/embed/"));
+    }
+
+    /** Opens a link in whichever app handles it (the YouTube app for YouTube links). */
+    private boolean openExternal(Uri url) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, url));
+            return true;
+        } catch (ActivityNotFoundException e) {
+            return false;
+        }
+    }
+
+    // --- Self-update: public/tv-version.json says which versionCode the site's APK is. ---
+
+    private void checkForUpdate() {
+        new Thread(() -> {
+            try {
+                JSONObject info = new JSONObject(download(VERSION_URL));
+                if (info.optInt("versionCode", 0) <= BuildConfig.VERSION_CODE) return;
+                String name = info.optString("versionName", "");
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    new AlertDialog.Builder(this)
+                            .setTitle("OnHockey Live " + name)
+                            .setMessage("มีแอปเวอร์ชันใหม่ อัปเดตเลยไหม?\nA new version of the app is available.")
+                            .setPositiveButton("Update", (d, w) -> startUpdate())
+                            .setNegativeButton("Later", null)
+                            .show();
+                });
+            } catch (Exception ignored) {
+                // No network or no version file: try again next launch.
+            }
+        }).start();
+    }
+
+    private void startUpdate() {
+        if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+            // One-time: let this app install updates, then come back and it continues.
+            updateAfterPermission = true;
+            Toast.makeText(this, "Allow OnHockey Live to install apps, then press Back", Toast.LENGTH_LONG).show();
+            try {
+                startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
+            } catch (ActivityNotFoundException e) {
+                startActivity(new Intent(Settings.ACTION_SECURITY_SETTINGS));
+            }
+            return;
+        }
+        Toast.makeText(this, "Downloading update…", Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            try {
+                PackageInstaller installer = getPackageManager().getPackageInstaller();
+                PackageInstaller.SessionParams params = new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+                params.setAppPackageName(getPackageName());
+                int id = installer.createSession(params);
+                try (PackageInstaller.Session session = installer.openSession(id)) {
+                    HttpURLConnection c = (HttpURLConnection) new URL(APK_URL).openConnection();
+                    try (InputStream in = c.getInputStream(); OutputStream out = session.openWrite("app.apk", 0, -1)) {
+                        byte[] buf = new byte[65536];
+                        for (int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
+                        session.fsync(out);
+                    } finally {
+                        c.disconnect();
+                    }
+                    Intent status = new Intent(this, MainActivity.class).setAction(ACTION_INSTALL_STATUS);
+                    int flags = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0);
+                    session.commit(PendingIntent.getActivity(this, 0, status, flags).getIntentSender());
+                }
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(this, "Update failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        }).start();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (!ACTION_INSTALL_STATUS.equals(intent.getAction())) return;
+        int status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
+        if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+            // The system's "Install update?" screen.
+            Intent confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT);
+            if (confirm != null) startActivity(confirm);
+        } else if (status != PackageInstaller.STATUS_SUCCESS) {
+            String message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
+            Toast.makeText(this, "Update failed: " + message, Toast.LENGTH_LONG).show();
+        }
     }
 
     @Override
@@ -142,6 +254,10 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         web.onResume();
+        if (updateAfterPermission && (Build.VERSION.SDK_INT < 26 || getPackageManager().canRequestPackageInstalls())) {
+            updateAfterPermission = false;
+            startUpdate();
+        }
     }
 
     @Override
@@ -167,6 +283,12 @@ public class MainActivity extends Activity {
                         + (error == null ? "null" : JSONObject.quote(error)) + ")";
                 web.post(() -> web.evaluateJavascript(js, null));
             }).start();
+        }
+
+        /** Opens a link outside the WebView, e.g. a YouTube video in the YouTube app. */
+        @JavascriptInterface
+        public boolean openUrl(String url) {
+            return openExternal(Uri.parse(url));
         }
 
         @JavascriptInterface

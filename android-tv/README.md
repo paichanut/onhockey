@@ -12,6 +12,10 @@ What it adds over opening the site in a TV browser:
 - **Remote control.** Arrow keys move between games, chips and stream buttons; OK opens; Back
   closes the open game, then leaves the app.
 - **Fullscreen** from the "Fullscreen" button next to Stop; Back exits it.
+- **YouTube opens in the YouTube app** (TV or phone), which plays much better than a WebView.
+- **Self-update.** On launch it reads `https://onhockey.vercel.app/tv-version.json`; when that
+  `versionCode` is newer it offers to download and install `onhockey-tv.apk` (the first time,
+  Android asks to allow OnHockey Live to install apps).
 - Its own tile on the Google TV home screen; the screen stays on while it is open.
 
 The app only wraps the website, so site updates show up without reinstalling.
@@ -46,4 +50,7 @@ cp app/build/outputs/apk/release/app-release.apk ../public/onhockey-tv.apk
 `sideload.keystore` (password `onhockey`) signs every build with the same key, so a new APK
 installs over the old one. It is only for sideloading, not a store identity.
 
-Bump `versionCode` / `versionName` in `app/build.gradle` when the app itself changes.
+When the app itself changes: bump `versionCode` / `versionName` in `app/build.gradle`, copy the
+new APK to `public/onhockey-tv.apk`, and set the same numbers in `public/tv-version.json`, so
+installed apps offer the update. Website changes need none of this; the app always loads the
+live site.
