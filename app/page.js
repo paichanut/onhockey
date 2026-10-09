@@ -36,6 +36,8 @@ const TIMEZONES = [
   { value: '12', label: 'Auckland (GMT+12)' },
 ];
 
+const AUTO_REFRESH_MS = 5 * 60 * 1000;
+
 const LEAGUE_FILTERS = [
   { value: 'NA', label: 'North America' },
   { value: 'RU', label: 'Russia/KZ/BY' },
@@ -132,6 +134,11 @@ export default function Home() {
   const [filters, setFilters] = useState([]);
   const [channels, setChannels] = useState([]);
   const narrow = useNarrow();
+  // YouTube opens in the YouTube app on Android; elsewhere it plays in the page.
+  const [youtubeApp, setYoutubeApp] = useState(false);
+  useEffect(() => {
+    setYoutubeApp(!!window.OnHockeyTV?.openUrl || (!hasTvApp() && /Android/i.test(navigator.userAgent)));
+  }, []);
 
   // TV remote: Back closes the open game before the app goes back or exits.
   useTvRemote(() => {
@@ -186,8 +193,27 @@ export default function Home() {
       setError(err.message);
     } finally {
       setLoading(false);
+      setNextRefresh(Date.now() + AUTO_REFRESH_MS);
     }
   };
+
+  // Auto-refresh every 5 minutes while the page is open (shown as a countdown on Refresh).
+  const [nextRefresh, setNextRefresh] = useState(null);
+  const [clock, setClock] = useState(0);
+  const fetchRef = useRef(fetchSchedule);
+  fetchRef.current = fetchSchedule;
+  useEffect(() => {
+    const timer = setInterval(() => setClock(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (nextRefresh && !loading && clock >= nextRefresh && !document.hidden) fetchRef.current();
+  }, [clock]);
+  const countdown = (() => {
+    if (!nextRefresh || !clock) return '';
+    const left = Math.max(0, Math.ceil((nextRefresh - clock) / 1000));
+    return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+  })();
 
   useEffect(() => {
     fetchSchedule();
@@ -222,6 +248,15 @@ export default function Home() {
 
   const playVideo = (key, channel, video) => {
     trackPlay({ league: channel.name, game: video.title.slice(0, 100), source: 'YouTube' });
+    // On Android (the TV/phone app, or a phone browser) hand the video to the YouTube app.
+    const watchUrl = `https://www.youtube.com/watch?v=${video.id}`;
+    if (window.OnHockeyTV?.openUrl && window.OnHockeyTV.openUrl(watchUrl)) return;
+    if (!hasTvApp() && /Android/i.test(navigator.userAgent)) {
+      window.location.href =
+        `intent://www.youtube.com/watch?v=${video.id}#Intent;scheme=https;package=com.google.android.youtube;` +
+        `S.browser_fallback_url=${encodeURIComponent(watchUrl)};end`;
+      return;
+    }
     setPlaying({
       key,
       linkUrl: video.id,
@@ -292,6 +327,7 @@ export default function Home() {
           <button type="button" className="btn-primary" onClick={fetchSchedule} disabled={loading}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
             {loading ? 'Loading…' : 'Refresh'}
+            {!loading && countdown && <span className="countdown" title="Refreshes automatically">{countdown}</span>}
           </button>
         </div>
         <nav className="wrap chips" aria-label="Filter leagues by region">
@@ -351,7 +387,7 @@ export default function Home() {
                         )}
                         <div className="streams">
                           <button type="button" className="stream" aria-pressed={on} onClick={() => playVideo(key, video.channel, video)}>
-                            <b>Watch here</b>
+                            <b>{youtubeApp ? 'Watch in YouTube app' : 'Watch here'}</b>
                             <small>YouTube</small>
                           </button>
                           <a className="stream" href={`https://www.youtube.com/watch?v=${video.id}`} target="_blank" rel="noopener noreferrer">
