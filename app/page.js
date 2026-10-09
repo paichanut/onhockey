@@ -50,10 +50,11 @@ const LEAGUE_FILTERS = [
   { value: 'TH', label: 'Thailand' },
   { value: 'KR', label: 'Korea' },
   { value: 'TW', label: 'Taiwan' },
+  { value: 'ASIA', label: 'SE Asia' },
 ];
 
 // Region filter chip for each YouTube channel's region.
-const CHANNEL_REGION_FILTER = { Thailand: 'TH', Korea: 'KR', Taiwan: 'TW' };
+const CHANNEL_REGION_FILTER = { Thailand: 'TH', Korea: 'KR', Taiwan: 'TW', Asia: 'ASIA' };
 
 // Plays .m3u8 streams: natively in Safari, via hls.js everywhere else.
 function HlsVideo({ src }) {
