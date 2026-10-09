@@ -32,3 +32,9 @@ yarn-error.log*
 
 # chromium writes this when loading the unpacked extension
 extension/_metadata/
+
+# Android TV app build output
+android-tv/.gradle/
+android-tv/build/
+android-tv/app/build/
+android-tv/local.properties

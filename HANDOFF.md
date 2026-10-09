@@ -59,6 +59,14 @@ onhockey.tv doesn't block home internet connections. With the proxy in `proxy/` 
 - A free ngrok account runs one tunnel at a time, so stop ngrok on any other computer.
 - The proxy works but the live site doesn't: `PROXY_URL` (step 5) doesn't match your tunnel's address.
 
+## Google TV / Android TV app
+
+`android-tv/` is a sideload-only WebView app for TVs; viewers download it from
+`https://onhockey.vercel.app/onhockey-tv.apk` (built copy in `public/`). It fetches the schedule
+natively from the viewer's own connection, so it does not need the home server. Install and
+build steps: `android-tv/README.md`. The site's TV support (remote navigation, native fetch)
+lives in `lib/tv.js` and turns on inside the app or with `?tv=1`.
+
 ## How viewers use it
 
 Pick one, once:
@@ -78,6 +86,8 @@ Pick one, once:
 |---|---|
 | `app/page.js` | The whole UI. Gets the schedule from the extension, then the bookmark's tab, then `/api/schedule`. Shows the setup screen when none of those work. |
 | `lib/onhockey.js` | Parses the schedule HTML, shifts times to the chosen timezone, builds player URLs from `np_*.php` links, and holds the postMessage helpers and the bookmarklet. |
+| `lib/tv.js` | TV app support: native schedule fetch through `window.OnHockeyTV` and D-pad (arrow key) focus navigation. |
+| `android-tv/` | The Google TV / Android TV WebView app (sideload only). |
 | `extension/` | Manifest V3 extension: a background worker fetches `schedule_table.php`, `rules.json` adds the Referer, and a content script relays to the page. |
 | `public/onhockey-extension.zip` | Download of `extension/`. Rebuild it after any change to that folder. |
 | `app/api/schedule/route.js` | Server relay. It only works where onhockey.tv isn't blocked, or through the optional home proxy (`PROXY_URL`). |

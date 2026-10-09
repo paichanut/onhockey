@@ -1,0 +1,18 @@
+pluginManagement {
+    repositories {
+        google()
+        // Google's mirror of Maven Central, tried first (Maven Central rate-limits busy IPs).
+        maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositories {
+        google()
+        maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }
+        mavenCentral()
+    }
+}
+rootProject.name = 'OnHockeyTV'
+include ':app'

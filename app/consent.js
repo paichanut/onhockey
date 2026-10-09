@@ -59,6 +59,10 @@ gtag('config', '${gaId}');`}
 
       {choice !== undefined && (
         <footer className="wrap site-foot">
+          <a className="link-btn" href="/onhockey-tv.apk" download>
+            Android / Google TV app
+          </a>
+          {' · '}
           <button type="button" className="link-btn" onClick={() => setChoice(null)}>
             Cookie settings · ตั้งค่าคุกกี้
           </button>
