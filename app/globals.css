@@ -36,6 +36,9 @@ a:hover { color: #b5ddff; }
 .pill { padding: 4px 10px; border-radius: 999px; background: var(--field); color: #9fb2cc; font-size: 13px; }
 .tz { display: flex; align-items: center; gap: 8px; color: #9fb2cc; font-size: 14px; }
 .tz select { background: var(--field); color: var(--text); border: 1px solid var(--field-line); border-radius: 8px; padding: 10px 12px; font-size: 14px; min-height: 44px; }
+.btn-app { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--accent); color: var(--accent); background: transparent; font-weight: 600; font-size: 14px; text-decoration: none; }
+.btn-app:hover { background: rgba(92, 200, 255, 0.1); color: var(--accent); }
+.btn-app small { font-weight: 400; font-size: 12px; color: var(--muted); }
 .btn-primary { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border: 0; border-radius: 8px; background: var(--accent); color: var(--on-accent); font-weight: 600; font-size: 14px; cursor: pointer; }
 .countdown { font-variant-numeric: tabular-nums; font-weight: 500; opacity: 0.7; min-width: 2.6em; text-align: right; }
 .btn-primary:disabled { opacity: 0.6; cursor: default; }
@@ -129,4 +132,9 @@ html.tv .game-row:focus { outline-offset: -3px; background: rgba(92, 200, 255, 0
   .tz { flex: 1 1 0; min-width: 0; }
   .tz-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .tz select { width: 100%; }
+  .btn-app { min-height: 40px; padding: 0 12px; }
+  .btn-app small { display: none; }
+}
+@media (max-width: 520px) {
+  .pill { display: none; }
 }

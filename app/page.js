@@ -136,7 +136,10 @@ export default function Home() {
   const narrow = useNarrow();
   // YouTube opens in the YouTube app on Android; elsewhere it plays in the page.
   const [youtubeApp, setYoutubeApp] = useState(false);
+  // Inside the TV/phone app there is no point offering the app download.
+  const [inTvApp, setInTvApp] = useState(false);
   useEffect(() => {
+    setInTvApp(hasTvApp());
     setYoutubeApp(!!window.OnHockeyTV?.openUrl || (!hasTvApp() && /Android/i.test(navigator.userAgent)));
   }, []);
 
@@ -314,6 +317,13 @@ export default function Home() {
               <span className="pill">
                 Ad-free · {leagues.length} leagues{liveCount ? ` · ${liveCount} live` : ''}
               </span>
+            )}
+            {!inTvApp && (
+              <a className="btn-app" href="/onhockey-tv.apk" download title="Android phone & Google TV app">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.2 9.5h9.6v7.7a1 1 0 0 1-1 1h-.9v2.6a1.2 1.2 0 0 1-2.4 0v-2.6h-1v2.6a1.2 1.2 0 0 1-2.4 0v-2.6h-.9a1 1 0 0 1-1-1zM5 9.7a1.2 1.2 0 0 1 2.4 0V15a1.2 1.2 0 0 1-2.4 0zm11.6 0a1.2 1.2 0 0 1 2.4 0V15a1.2 1.2 0 0 1-2.4 0zM7.3 8.7a4.8 4.8 0 0 1 2.4-3.9l-.8-1.4a.3.3 0 0 1 .5-.3l.8 1.4a5 5 0 0 1 3.6 0l.8-1.4a.3.3 0 0 1 .5.3l-.8 1.4a4.8 4.8 0 0 1 2.4 3.9zm2.6-2a.6.6 0 1 0 0 1.2.6.6 0 0 0 0-1.2zm4.2 0a.6.6 0 1 0 0 1.2.6.6 0 0 0 0-1.2z" /></svg>
+                <span>Get the app</span>
+                <small>Android · TV</small>
+              </a>
             )}
           </div>
           <label className="tz">
