@@ -111,8 +111,14 @@ const Chevron = () => (
 function CalendarLink({ title, start, minutes }) {
   const [siteUrl, setSiteUrl] = useState('https://onhockey.vercel.app');
   useEffect(() => setSiteUrl(window.location.origin), []);
+  const href = googleCalendarUrl({ title, start, minutes, siteUrl });
+  // In the Android app, hand the link to the Calendar app or browser (signed in to Google)
+  // rather than opening Google's login page inside the app's WebView.
+  const openOutside = (e) => {
+    if (window.OnHockeyTV?.openUrl && window.OnHockeyTV.openUrl(href)) e.preventDefault();
+  };
   return (
-    <a className="stream cal" href={googleCalendarUrl({ title, start, minutes, siteUrl })} target="_blank" rel="noopener noreferrer">
+    <a className="stream cal" href={href} target="_blank" rel="noopener noreferrer" onClick={openOutside}>
       <b>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18M12 13v5M9.5 15.5h5" /></svg>
         Add to Google Calendar
@@ -155,8 +161,11 @@ export default function Home() {
   const [youtubeApp, setYoutubeApp] = useState(false);
   // Inside the TV/phone app there is no point offering the app download.
   const [inTvApp, setInTvApp] = useState(false);
+  // The app on a TV (no touchscreen), where a calendar button has nowhere to go.
+  const [onTvScreen, setOnTvScreen] = useState(false);
   useEffect(() => {
     setInTvApp(hasTvApp());
+    setOnTvScreen(hasTvApp() && !navigator.maxTouchPoints);
     setYoutubeApp(!!window.OnHockeyTV?.openUrl || (!hasTvApp() && /Android/i.test(navigator.userAgent)));
   }, []);
 
@@ -417,7 +426,7 @@ export default function Home() {
                             <b>{youtubeApp ? 'Watch in YouTube app' : 'Watch here'}</b>
                             <small>YouTube</small>
                           </button>
-                          {!inTvApp && video.status === 'upcoming' && video.startsAt && Date.parse(video.startsAt) > now && (
+                          {!onTvScreen && video.status === 'upcoming' && video.startsAt && Date.parse(video.startsAt) > now && (
                             <CalendarLink title={`🏒 ${video.title}`} start={Date.parse(video.startsAt)} minutes={120} />
                           )}
                           <a className="stream" href={`https://www.youtube.com/watch?v=${video.id}`} target="_blank" rel="noopener noreferrer">
@@ -499,7 +508,7 @@ export default function Home() {
                       {isOpen && (
                         <div className="drop" id={dropId}>
                           {narrow && playing?.key === game.key && <Player stream={playing.stream} />}
-                          {!inTvApp && !game.isLive && gameStart(game, now) > now && (
+                          {!onTvScreen && !game.isLive && gameStart(game, now) > now && (
                             <div className="streams">
                               <CalendarLink title={`🏒 ${game.teams} (${league.name})`} start={gameStart(game, now)} />
                             </div>
