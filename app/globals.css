@@ -76,6 +76,8 @@ a:hover { color: #b5ddff; }
 .stream { min-height: 56px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 2px; padding: 6px 14px; border-radius: 10px; cursor: pointer; text-align: left; background: var(--field); color: var(--text); border: 1px solid var(--field-line); font-size: 15px; }
 .stream:hover { border-color: var(--accent); }
 a.stream { text-decoration: none; }
+a.stream.cal { border-style: dashed; grid-column: 1 / -1; max-width: 340px; }
+a.stream.cal b svg { color: var(--accent); }
 .channel-idle { border-top: 1px solid var(--line-soft); padding: 14px 18px; }
 a.stream:hover { color: var(--text); }
 .stream[aria-pressed='true'] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }

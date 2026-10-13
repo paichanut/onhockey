@@ -11,6 +11,8 @@ import {
   openedByBookmarklet,
   fetchScheduleViaBookmarklet,
   bookmarklet,
+  gameStart,
+  googleCalendarUrl,
 } from '@/lib/onhockey';
 import { hasTvApp, fetchScheduleViaTvApp, useTvRemote } from '@/lib/tv';
 
@@ -104,6 +106,21 @@ function Player({ stream }) {
 const Chevron = () => (
   <svg className="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
 );
+
+// "Add to Google Calendar" for a game or stream that has not started; the event links back here.
+function CalendarLink({ title, start, minutes }) {
+  const [siteUrl, setSiteUrl] = useState('https://onhockey.vercel.app');
+  useEffect(() => setSiteUrl(window.location.origin), []);
+  return (
+    <a className="stream cal" href={googleCalendarUrl({ title, start, minutes, siteUrl })} target="_blank" rel="noopener noreferrer">
+      <b>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18M12 13v5M9.5 15.5h5" /></svg>
+        Add to Google Calendar
+      </b>
+      <small>Reminder with a link back here</small>
+    </a>
+  );
+}
 
 const ExternalIcon = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-label="opens in a new tab"><path d="M14 4h6v6" /><path d="M20 4l-9 9" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>
@@ -400,6 +417,9 @@ export default function Home() {
                             <b>{youtubeApp ? 'Watch in YouTube app' : 'Watch here'}</b>
                             <small>YouTube</small>
                           </button>
+                          {!inTvApp && video.status === 'upcoming' && video.startsAt && Date.parse(video.startsAt) > now && (
+                            <CalendarLink title={`🏒 ${video.title}`} start={Date.parse(video.startsAt)} minutes={120} />
+                          )}
                           <a className="stream" href={`https://www.youtube.com/watch?v=${video.id}`} target="_blank" rel="noopener noreferrer">
                             <b>Open on YouTube<ExternalIcon /></b>
                             <small>New tab</small>
@@ -479,6 +499,11 @@ export default function Home() {
                       {isOpen && (
                         <div className="drop" id={dropId}>
                           {narrow && playing?.key === game.key && <Player stream={playing.stream} />}
+                          {!inTvApp && !game.isLive && gameStart(game, now) > now && (
+                            <div className="streams">
+                              <CalendarLink title={`🏒 ${game.teams} (${league.name})`} start={gameStart(game, now)} />
+                            </div>
+                          )}
                           {game.links.length ? (
                             <div className="streams">
                               {game.links.map((link, i) => {
