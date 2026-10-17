@@ -107,6 +107,33 @@ const Chevron = () => (
   <svg className="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
 );
 
+// Refresh button with the auto-refresh countdown. Its own component, so the once-a-second
+// tick re-renders only the button, not the whole schedule (which is slow on TVs).
+function RefreshButton({ loading, nextRefresh, onRefresh }) {
+  const [clock, setClock] = useState(0);
+  const refreshRef = useRef(onRefresh);
+  refreshRef.current = onRefresh;
+  useEffect(() => {
+    const timer = setInterval(() => setClock(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (nextRefresh && !loading && clock >= nextRefresh && !document.hidden) refreshRef.current();
+  }, [clock]);
+  let countdown = '';
+  if (nextRefresh && clock) {
+    const left = Math.max(0, Math.ceil((nextRefresh - clock) / 1000));
+    countdown = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+  }
+  return (
+    <button type="button" className="btn-primary" onClick={onRefresh} disabled={loading}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
+      {loading ? 'Loading…' : 'Refresh'}
+      {!loading && countdown && <span className="countdown" title="Refreshes automatically">{countdown}</span>}
+    </button>
+  );
+}
+
 // "Add to Google Calendar" for a game or stream that has not started; the event links back here.
 function CalendarLink({ title, start, minutes }) {
   const [siteUrl, setSiteUrl] = useState('https://onhockey.vercel.app');
@@ -226,23 +253,8 @@ export default function Home() {
     }
   };
 
-  // Auto-refresh every 5 minutes while the page is open (shown as a countdown on Refresh).
+  // Auto-refresh every 5 minutes while the page is open (the countdown lives in RefreshButton).
   const [nextRefresh, setNextRefresh] = useState(null);
-  const [clock, setClock] = useState(0);
-  const fetchRef = useRef(fetchSchedule);
-  fetchRef.current = fetchSchedule;
-  useEffect(() => {
-    const timer = setInterval(() => setClock(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-  useEffect(() => {
-    if (nextRefresh && !loading && clock >= nextRefresh && !document.hidden) fetchRef.current();
-  }, [clock]);
-  const countdown = (() => {
-    if (!nextRefresh || !clock) return '';
-    const left = Math.max(0, Math.ceil((nextRefresh - clock) / 1000));
-    return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
-  })();
 
   useEffect(() => {
     fetchSchedule();
@@ -300,10 +312,15 @@ export default function Home() {
     setFilters(filters.includes(value) ? filters.filter((f) => f !== value) : [...filters, value]);
   };
 
-  // Keys come from each game's position in the full schedule, so filtering keeps them stable.
-  const keyed = leagues.map((league, li) => ({
+  // Keys come from the game itself (league, time, teams), so the open game and the playing
+  // stream stay put when a refresh adds, removes or reorders games.
+  const keyed = leagues.map((league) => ({
     ...league,
-    games: league.games.map((game, gi) => ({ ...game, key: `${li}-${gi}` })),
+    games: league.games.map((game, gi, all) => {
+      const id = `${league.name}-${game.hour}${game.minutes}-${game.teams}`.replace(/[^\p{L}\p{N}]+/gu, '_');
+      const dupes = all.slice(0, gi).filter((g) => g.hour === game.hour && g.minutes === game.minutes && g.teams === game.teams).length;
+      return { ...game, key: dupes ? `${id}_${dupes}` : id };
+    }),
   }));
   const shown = filters.length ? keyed.filter((league) => filters.includes(league.class)) : keyed;
   // All channels' streams merged into one "YouTube Live" card: live now first, then by start time.
@@ -360,11 +377,7 @@ export default function Home() {
               ))}
             </select>
           </label>
-          <button type="button" className="btn-primary" onClick={fetchSchedule} disabled={loading}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
-            {loading ? 'Loading…' : 'Refresh'}
-            {!loading && countdown && <span className="countdown" title="Refreshes automatically">{countdown}</span>}
-          </button>
+          <RefreshButton loading={loading} nextRefresh={nextRefresh} onRefresh={fetchSchedule} />
         </div>
         <nav className="wrap chips" aria-label="Filter leagues by region">
           <button type="button" className="chip" aria-pressed={filters.length === 0} onClick={() => setFilters([])}>All</button>
