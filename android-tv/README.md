@@ -16,6 +16,9 @@ What it adds over opening the site in a TV browser:
 - **Self-update.** On launch it reads `https://onhockey.vercel.app/tv-version.json`; when that
   `versionCode` is newer it offers to download and install `onhockey-tv.apk` (the first time,
   Android asks to allow OnHockey Live to install apps).
+- **Phones and TVs from one APK.** On a TV it loads the site with `?tv=1` (remote-control layout);
+  on a phone with `?app=1` (normal touch layout, calendar button). `OnHockeyTV.isTv()` tells the
+  page which.
 - Its own tile on the Google TV home screen; the screen stays on while it is open.
 
 The app only wraps the website, so site updates show up without reinstalling.

@@ -4,9 +4,12 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.PendingIntent;
+import android.app.UiModeManager;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageInstaller;
+import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
@@ -40,7 +43,7 @@ import java.util.regex.Pattern;
  * natively (window.OnHockeyTV), remote-control Back handling and fullscreen video.
  */
 public class MainActivity extends Activity {
-    private static final String APP_URL = "https://onhockey.vercel.app/?tv=1";
+    private static final String SITE_URL = "https://onhockey.vercel.app/";
     private static final String VERSION_URL = "https://onhockey.vercel.app/tv-version.json";
     private static final String APK_URL = "https://onhockey.vercel.app/onhockey-tv.apk";
     private static final String ACTION_INSTALL_STATUS = "tv.onhockey.app.INSTALL_STATUS";
@@ -116,10 +119,17 @@ public class MainActivity extends Activity {
         web.setWebChromeClient(chrome);
 
         if (savedInstanceState == null || web.restoreState(savedInstanceState) == null) {
-            web.loadUrl(APP_URL);
+            // TVs get the remote-control layout; phones get the normal one.
+            web.loadUrl(SITE_URL + (isTelevision() ? "?tv=1" : "?app=1"));
         }
         web.requestFocus();
         checkForUpdate();
+    }
+
+    private boolean isTelevision() {
+        UiModeManager ui = (UiModeManager) getSystemService(UI_MODE_SERVICE);
+        return (ui != null && ui.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION)
+                || getPackageManager().hasSystemFeature(PackageManager.FEATURE_LEANBACK);
     }
 
     private static boolean isYouTube(Uri url) {
@@ -289,6 +299,12 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public boolean openUrl(String url) {
             return openExternal(Uri.parse(url));
+        }
+
+        /** True on a TV (remote-control layout); false on a phone or tablet. */
+        @JavascriptInterface
+        public boolean isTv() {
+            return isTelevision();
         }
 
         @JavascriptInterface

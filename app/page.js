@@ -14,7 +14,7 @@ import {
   gameStart,
   googleCalendarUrl,
 } from '@/lib/onhockey';
-import { hasTvApp, fetchScheduleViaTvApp, useTvRemote } from '@/lib/tv';
+import { hasTvApp, isTv, fetchScheduleViaTvApp, useTvRemote } from '@/lib/tv';
 
 const TIMEZONES = [
   { value: '-08', label: 'Anchorage (AKDT/GMT-8)' },
@@ -188,11 +188,11 @@ export default function Home() {
   const [youtubeApp, setYoutubeApp] = useState(false);
   // Inside the TV/phone app there is no point offering the app download.
   const [inTvApp, setInTvApp] = useState(false);
-  // The app on a TV (no touchscreen), where a calendar button has nowhere to go.
+  // The app on a TV, where a calendar button has nowhere to go.
   const [onTvScreen, setOnTvScreen] = useState(false);
   useEffect(() => {
     setInTvApp(hasTvApp());
-    setOnTvScreen(hasTvApp() && !navigator.maxTouchPoints);
+    setOnTvScreen(isTv());
     setYoutubeApp(!!window.OnHockeyTV?.openUrl || (!hasTvApp() && /Android/i.test(navigator.userAgent)));
   }, []);
 
