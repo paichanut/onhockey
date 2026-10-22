@@ -8,6 +8,7 @@ const CHANNELS = [
   { handle: '@ljfilmsports', region: 'Korea', name: 'LJ Film Sports' },
   { handle: '@unproanchor', region: 'Taiwan', name: 'Unpro Hockey Live' },
   { handle: '@powerplayse', region: 'Asia', name: 'PowerplaySE' },
+  { handle: '@hockeytvkorea', region: 'Korea', name: 'Hockey TV Korea' },
 ];
 
 export async function GET() {
