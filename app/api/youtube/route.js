@@ -10,6 +10,7 @@ const CHANNELS = [
   { handle: '@unproanchor', region: 'Taiwan', name: 'Unpro Hockey Live' },
   { handle: '@powerplayse', region: 'Asia', name: 'PowerplaySE' },
   { handle: '@hockeytvkorea', region: 'Korea', name: 'Hockey TV Korea' },
+  { handle: '@seoulicehockey', region: 'Korea', name: 'Seoul Ice Hockey Association' },
 ];
 
 export async function GET() {
