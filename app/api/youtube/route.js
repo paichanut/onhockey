@@ -11,6 +11,7 @@ const CHANNELS = [
   { handle: '@powerplayse', region: 'Asia', name: 'PowerplaySE' },
   { handle: '@hockeytvkorea', region: 'Korea', name: 'Hockey TV Korea' },
   { handle: '@seoulicehockey', region: 'Korea', name: 'Seoul Ice Hockey Association' },
+  { handle: '@ThunderHockey-L3tsgo', region: 'USA', name: 'Thunder Hockey' },
 ];
 
 export async function GET() {
