@@ -410,20 +410,20 @@ export default function Home() {
                       aria-controls={`drop-${key}`}
                       onClick={() => setOpenKey(isOpen ? null : key)}
                     >
-                      <span className="game-time yt">
-                        {video.status === 'live' ? (
-                          <span className="live">LIVE</span>
-                        ) : video.startsAt ? (
-                          <>
-                            <b className="yt-clock">{startLabel(video.startsAt).time}</b>
-                            <small>{startLabel(video.startsAt).day}</small>
-                          </>
-                        ) : (
-                          'Soon'
-                        )}
-                      </span>
                       <span className="yt-thumb">
                         <img src={`https://i.ytimg.com/vi/${video.id}/mqdefault.jpg`} alt="" loading="lazy" />
+                        <span className="game-time yt">
+                          {video.status === 'live' ? (
+                            <span className="live">LIVE</span>
+                          ) : video.startsAt ? (
+                            <>
+                              <b className="yt-clock">{startLabel(video.startsAt).time}</b>
+                              <small>{startLabel(video.startsAt).day}</small>
+                            </>
+                          ) : (
+                            'Soon'
+                          )}
+                        </span>
                       </span>
                       <span className="game-teams">{video.title}</span>
                       <span className="game-links soon">{video.status === 'live' ? video.when : 'Scheduled'}</span>
