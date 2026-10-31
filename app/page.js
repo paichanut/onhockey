@@ -422,6 +422,9 @@ export default function Home() {
                           'Soon'
                         )}
                       </span>
+                      <span className="yt-thumb">
+                        <img src={`https://i.ytimg.com/vi/${video.id}/mqdefault.jpg`} alt="" loading="lazy" />
+                      </span>
                       <span className="game-teams">{video.title}</span>
                       <span className="game-links soon">{video.status === 'live' ? video.when : 'Scheduled'}</span>
                       <Chevron />
