@@ -308,6 +308,8 @@ export default function Home() {
     trackPlay({ league: channel.name, game: video.title.slice(0, 100), source: 'YouTube' });
     const watchUrl = `https://www.youtube.com/watch?v=${video.id}`;
     if (outside) {
+      // Leaving for YouTube stops the copy playing in the page.
+      if (playing?.key === key) setPlaying(null);
       if (window.OnHockeyTV?.openUrl && window.OnHockeyTV.openUrl(watchUrl)) return;
       if (!hasTvApp() && /Android/i.test(navigator.userAgent)) {
         window.location.href =
@@ -432,7 +434,11 @@ export default function Home() {
                       className="game-row"
                       aria-expanded={isOpen}
                       aria-controls={`drop-${key}`}
-                      onClick={() => setOpenKey(isOpen ? null : key)}
+                      onClick={() => {
+                        setOpenKey(isOpen ? null : key);
+                        // Where YouTube plays in the page, tapping the game starts it right away.
+                        if (!isOpen && !handOffYouTube && !on) playVideo(key, video.channel, video);
+                      }}
                     >
                       <span className="yt-thumb">
                         <img src={`https://i.ytimg.com/vi/${video.id}/mqdefault.jpg`} alt="" loading="lazy" />
@@ -462,10 +468,13 @@ export default function Home() {
                           </p>
                         )}
                         <div className="streams">
-                          <button type="button" className="stream" aria-pressed={on} onClick={() => playVideo(key, video.channel, video)}>
-                            <b>{handOffYouTube ? 'Watch in YouTube app' : 'Watch here'}</b>
-                            <small>YouTube</small>
-                          </button>
+                          {/* Where tapping the game already plays it here, "Watch here" is only needed after Stop. */}
+                          {(handOffYouTube || !on) && (
+                            <button type="button" className="stream" aria-pressed={on} onClick={() => playVideo(key, video.channel, video)}>
+                              <b>{handOffYouTube ? 'Watch in YouTube app' : 'Watch here'}</b>
+                              <small>YouTube</small>
+                            </button>
+                          )}
                           {/* When "Watch" already opens the YouTube app, a second button would be a duplicate. */}
                           {!handOffYouTube && youtubeApp && (
                             <button type="button" className="stream" onClick={() => playVideo(key, video.channel, video, { outside: true })}>
@@ -474,7 +483,7 @@ export default function Home() {
                             </button>
                           )}
                           {!youtubeApp && (
-                            <a className="stream" href={`https://www.youtube.com/watch?v=${video.id}`} target="_blank" rel="noopener noreferrer">
+                            <a className="stream" href={`https://www.youtube.com/watch?v=${video.id}`} target="_blank" rel="noopener noreferrer" onClick={() => on && setPlaying(null)}>
                               <b>Open on YouTube<ExternalIcon /></b>
                               <small>New tab</small>
                             </a>
