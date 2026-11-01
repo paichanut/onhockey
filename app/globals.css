@@ -149,3 +149,15 @@ html.tv .game-row:focus-visible { outline-offset: -3px; background: rgba(92, 200
 @media (max-width: 520px) {
   .pill { display: none; }
 }
+
+/* Phones in portrait: the cover's badge already says when, so drop the "Scheduled" /
+   "N watching" column and give the title that width, clamped to three lines. */
+@media (max-width: 600px) {
+  .game-row:has(.yt-thumb) { gap: 12px; }
+  .game-row:has(.yt-thumb) .game-links { display: none; }
+  .game-row:has(.yt-thumb) .game-teams {
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    font-size: 14px; line-height: 1.35; overflow-wrap: anywhere;
+  }
+  .yt-thumb { width: 140px; }
+}
