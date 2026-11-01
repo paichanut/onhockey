@@ -193,6 +193,11 @@ export default function Home() {
   useEffect(() => {
     setInTvApp(hasTvApp());
     setOnTvScreen(isTv());
+    // Phone app builds before 1.3 draw under Android's navigation bar: leave room at the bottom.
+    const appVersion = window.OnHockeyTV?.version?.() || '';
+    if (hasTvApp() && !isTv() && appVersion && appVersion.localeCompare('1.3', undefined, { numeric: true }) < 0) {
+      document.documentElement.classList.add('app-nav-overlap');
+    }
     setYoutubeApp(!!window.OnHockeyTV?.openUrl || (!hasTvApp() && /Android/i.test(navigator.userAgent)));
   }, []);
 
