@@ -442,13 +442,16 @@ export default function Home() {
                             <b>{youtubeApp ? 'Watch in YouTube app' : 'Watch here'}</b>
                             <small>YouTube</small>
                           </button>
+                          {/* On Android "Watch" already opens the YouTube app, so this would be a duplicate. */}
+                          {!youtubeApp && (
+                            <a className="stream" href={`https://www.youtube.com/watch?v=${video.id}`} target="_blank" rel="noopener noreferrer">
+                              <b>Open on YouTube<ExternalIcon /></b>
+                              <small>New tab</small>
+                            </a>
+                          )}
                           {!onTvScreen && video.status === 'upcoming' && video.startsAt && Date.parse(video.startsAt) > now && (
                             <CalendarLink title={`🏒 ${video.title}`} start={Date.parse(video.startsAt)} minutes={120} />
                           )}
-                          <a className="stream" href={`https://www.youtube.com/watch?v=${video.id}`} target="_blank" rel="noopener noreferrer">
-                            <b>Open on YouTube<ExternalIcon /></b>
-                            <small>New tab</small>
-                          </a>
                         </div>
                       </div>
                     )}
