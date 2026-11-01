@@ -162,3 +162,10 @@ html.app-nav-overlap body { padding-bottom: 56px; }
   }
   .yt-thumb { width: 140px; }
 }
+
+/* Privacy policy */
+.privacy { max-width: 760px; padding-top: 32px; padding-bottom: 48px; line-height: 1.6; color: #ccd6e4; }
+.privacy h1 { font-family: var(--display); font-size: 40px; text-transform: uppercase; color: var(--text); margin: 0 0 4px; }
+.privacy h2 { font-size: 18px; color: var(--text); margin: 28px 0 6px; }
+.privacy ul { padding-left: 20px; }
+.privacy li { margin-bottom: 8px; }

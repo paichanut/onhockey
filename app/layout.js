@@ -23,11 +23,6 @@ export default function RootLayout({ children }) {
       <body>
         {children}
         <Analytics />
-        <footer className="wrap site-foot">
-          <a className="link-btn" href="/onhockey-tv.apk" download>
-            Android / Google TV app
-          </a>
-        </footer>
         <GoogleAnalytics gaId={GA_ID} />
       </body>
     </html>
