@@ -4,64 +4,33 @@ plugins {
 
 android {
     namespace 'tv.onhockey.app'
-    compileSdk 36
+    compileSdk 35
 
     defaultConfig {
+        applicationId 'tv.onhockey.app'
         minSdk 23
-        targetSdk 36
+        targetSdk 35
+        versionCode 4
+        versionName '1.3'
     }
 
+    // Sideload-only app: the key is committed so every build installs over the last one.
     signingConfigs {
-        // Sideload-only key: committed so every sideload build installs over the last one.
         sideload {
             storeFile file('../sideload.keystore')
             storePassword 'onhockey'
             keyAlias 'onhockey'
             keyPassword 'onhockey'
         }
-        // Play upload key: never committed. Pass its location and passwords as Gradle properties
-        // (-PplayStoreFile=… -PplayStorePassword=… -PplayKeyAlias=… -PplayKeyPassword=…).
-        if (project.hasProperty('playStoreFile')) {
-            play {
-                storeFile file(project.property('playStoreFile'))
-                storePassword project.property('playStorePassword')
-                keyAlias project.property('playKeyAlias')
-                keyPassword project.property('playKeyPassword')
-            }
-        }
-    }
-
-    flavorDimensions 'store'
-    productFlavors {
-        // OnHockey Live: the full site, sideloaded from onhockey.vercel.app, updates itself.
-        sideload {
-            dimension 'store'
-            applicationId 'tv.onhockey.app'
-            versionCode 4
-            versionName '1.3'
-            buildConfigField 'String', 'SITE_URL', '"https://onhockey.vercel.app/"'
-            buildConfigField 'String', 'UA_TAG', '"OnHockeyTV"'
-            buildConfigField 'boolean', 'KEEP_ON_SITE', 'false'
-            manifestPlaceholders = [usesCleartextTraffic: 'true']
-            signingConfig signingConfigs.sideload
-        }
-        // Ice Hockey TV Guide: the YouTube-only guide, published on Google Play.
-        play {
-            dimension 'store'
-            applicationId 'com.paichanut.icehockeytvguide'
-            versionCode 1
-            versionName '1.0'
-            buildConfigField 'String', 'SITE_URL', '"https://icehockeytvguide.vercel.app/"'
-            buildConfigField 'String', 'UA_TAG', '"IceHockeyTVGuide"'
-            buildConfigField 'boolean', 'KEEP_ON_SITE', 'true'
-            manifestPlaceholders = [usesCleartextTraffic: 'false']
-            signingConfig project.hasProperty('playStoreFile') ? signingConfigs.play : signingConfigs.sideload
-        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig signingConfigs.sideload
+        }
+        debug {
+            signingConfig signingConfigs.sideload
         }
     }
 
