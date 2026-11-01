@@ -50,7 +50,7 @@ export default function PrivacyPage() {
       <h2>Contact</h2>
       <p>Questions about this policy: use the developer email shown on the app&apos;s Google Play page.</p>
 
-      <p><a href="/guide">← Back to the guide</a></p>
+      <p><a href="/">← Back to the guide</a></p>
     </main>
   );
 }

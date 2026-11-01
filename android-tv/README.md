@@ -41,13 +41,16 @@ adb install -r onhockey-tv.apk
 
 ## Build
 
-Needs JDK 17+, Gradle 8.9+ and the Android SDK (platform 35, build-tools 35).
+Needs JDK 17+, Gradle 8.13+ and the Android SDK (platform 36, build-tools 36).
+
+There are two flavors: `sideload` (this OnHockey Live APK) and `play` (Ice Hockey TV Guide, the
+YouTube-only Google Play app; see `PLAY_STORE.md`). Flavor-specific code is in `app/src/<flavor>/`.
 
 ```bash
 cd android-tv
 echo "sdk.dir=/path/to/android-sdk" > local.properties
-gradle assembleRelease
-cp app/build/outputs/apk/release/app-release.apk ../public/onhockey-tv.apk
+gradle assembleSideloadRelease
+cp app/build/outputs/apk/sideload/release/app-sideload-release.apk ../public/onhockey-tv.apk
 ```
 
 `sideload.keystore` (password `onhockey`) signs every build with the same key, so a new APK
