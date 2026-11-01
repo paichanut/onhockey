@@ -84,14 +84,23 @@ function HlsVideo({ src }) {
   return <video ref={videoRef} controls autoPlay />;
 }
 
-function Player({ stream }) {
+// onStart (optional) makes the empty player's play button start something, e.g. a live game.
+function Player({ stream, onStart, startText }) {
+  const dot = (
+    <div className="play-dot">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="#06101f" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+    </div>
+  );
   return (
     <div className="player">
-      {!stream ? (
+      {!stream && onStart ? (
+        <button type="button" className="player-empty player-start" onClick={onStart}>
+          {dot}
+          {startText}
+        </button>
+      ) : !stream ? (
         <div className="player-empty">
-          <div className="play-dot">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="#06101f" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
-          </div>
+          {dot}
           Pick a game, then a stream
         </div>
       ) : stream.type === 'hls' ? (
@@ -292,16 +301,25 @@ export default function Home() {
     trackPlay({ league: league.name, game: game.teams, source: link.name });
   };
 
-  const playVideo = (key, channel, video) => {
+  // Android phones and TVs hand YouTube to the YouTube app; wide touch screens (tablets, car
+  // screens) play it in the page's player, with "Open in YouTube app" as a second button.
+  const handOffYouTube = youtubeApp && (narrow || onTvScreen);
+  const playVideo = (key, channel, video, { outside = handOffYouTube } = {}) => {
     trackPlay({ league: channel.name, game: video.title.slice(0, 100), source: 'YouTube' });
-    // On Android (the TV/phone app, or a phone browser) hand the video to the YouTube app.
     const watchUrl = `https://www.youtube.com/watch?v=${video.id}`;
-    if (window.OnHockeyTV?.openUrl && window.OnHockeyTV.openUrl(watchUrl)) return;
-    if (!hasTvApp() && /Android/i.test(navigator.userAgent)) {
-      window.location.href =
-        `intent://www.youtube.com/watch?v=${video.id}#Intent;scheme=https;package=com.google.android.youtube;` +
-        `S.browser_fallback_url=${encodeURIComponent(watchUrl)};end`;
-      return;
+    if (outside) {
+      if (window.OnHockeyTV?.openUrl && window.OnHockeyTV.openUrl(watchUrl)) return;
+      if (!hasTvApp() && /Android/i.test(navigator.userAgent)) {
+        window.location.href =
+          `intent://www.youtube.com/watch?v=${video.id}#Intent;scheme=https;package=com.google.android.youtube;` +
+          `S.browser_fallback_url=${encodeURIComponent(watchUrl)};end`;
+        return;
+      }
+      if (!hasTvApp()) {
+        window.open(watchUrl, '_blank', 'noopener');
+        return;
+      }
+      // The app found no YouTube app to open: play it here instead.
     }
     setPlaying({
       key,
@@ -339,6 +357,7 @@ export default function Home() {
     .filter((v, i, all) => all.findIndex((o) => o.id === v.id) === i)
     .sort((a, b) => startOf(a) - startOf(b));
   const ytLive = ytVideos.filter((v) => v.status === 'live').length;
+  const liveVideo = ytVideos.find((v) => v.status === 'live');
   const liveCount = leagues.reduce((n, l) => n + l.games.filter((g) => g.isLive).length, 0);
   const time = (g) => `${shiftHour(g.hour, timezone)}:${g.minutes}`;
   // A scheduled YouTube start, shown in the selected time zone (e.g. "09:50" / "Tomorrow").
@@ -444,10 +463,16 @@ export default function Home() {
                         )}
                         <div className="streams">
                           <button type="button" className="stream" aria-pressed={on} onClick={() => playVideo(key, video.channel, video)}>
-                            <b>{youtubeApp ? 'Watch in YouTube app' : 'Watch here'}</b>
+                            <b>{handOffYouTube ? 'Watch in YouTube app' : 'Watch here'}</b>
                             <small>YouTube</small>
                           </button>
-                          {/* On Android "Watch" already opens the YouTube app, so this would be a duplicate. */}
+                          {/* When "Watch" already opens the YouTube app, a second button would be a duplicate. */}
+                          {!handOffYouTube && youtubeApp && (
+                            <button type="button" className="stream" onClick={() => playVideo(key, video.channel, video, { outside: true })}>
+                              <b>Open in YouTube app<ExternalIcon /></b>
+                              <small>YouTube</small>
+                            </button>
+                          )}
                           {!youtubeApp && (
                             <a className="stream" href={`https://www.youtube.com/watch?v=${video.id}`} target="_blank" rel="noopener noreferrer">
                               <b>Open on YouTube<ExternalIcon /></b>
@@ -572,7 +597,13 @@ export default function Home() {
         </section>
 
         <aside className="watch" aria-label="Now watching">
-          {!narrow && <Player stream={playing?.stream} />}
+          {!narrow && (
+            <Player
+              stream={playing?.stream}
+              onStart={liveVideo ? () => playVideo(`yt-${liveVideo.id}`, liveVideo.channel, liveVideo) : null}
+              startText={liveVideo ? `Watch live: ${liveVideo.title}` : ''}
+            />
+          )}
           <div className="now">
             <div>
               <div className="now-meta">
