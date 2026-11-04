@@ -6,6 +6,7 @@ const CHANNELS = [
   { handle: '@ICEAGETHAILANDCHANNEL', region: 'Thailand' },
   { handle: '@Thatritorn', region: 'Thailand' },
   { handle: '@bkkicehockeychannel', region: 'Thailand', name: 'BKK Ice Hockey' },
+  { handle: '@subzeroiceskateclub', region: 'Thailand', name: 'Sub-Zero Ice Skate Club' },
   { handle: '@ljfilmsports', region: 'Korea', name: 'LJ Film Sports' },
   { handle: '@unproanchor', region: 'Taiwan', name: 'Unpro Hockey Live' },
   { handle: '@powerplayse', region: 'Asia', name: 'PowerplaySE' },
