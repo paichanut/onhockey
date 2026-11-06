@@ -1,23 +1,12 @@
+import { getChannels } from '@/lib/channels';
 import { fetchChannelStreams } from '@/lib/youtube';
 
-// YouTube channels shown alongside the onhockey.tv schedule.
-const CHANNELS = [
-  { handle: '@icehockeyfamily', region: 'Thailand' },
-  { handle: '@ICEAGETHAILANDCHANNEL', region: 'Thailand' },
-  { handle: '@Thatritorn', region: 'Thailand' },
-  { handle: '@bkkicehockeychannel', region: 'Thailand', name: 'BKK Ice Hockey' },
-  { handle: '@subzeroiceskateclub', region: 'Thailand', name: 'Sub-Zero Ice Skate Club' },
-  { handle: '@ljfilmsports', region: 'Korea', name: 'LJ Film Sports' },
-  { handle: '@unproanchor', region: 'Taiwan', name: 'Unpro Hockey Live' },
-  { handle: '@powerplayse', region: 'Asia', name: 'PowerplaySE' },
-  { handle: '@hockeytvkorea', region: 'Korea', name: 'Hockey TV Korea' },
-  { handle: '@seoulicehockey', region: 'Korea', name: 'Seoul Ice Hockey Association' },
-  { handle: '@ThunderHockey-L3tsgo', region: 'USA', name: 'Thunder Hockey' },
-];
+// Channels come from the list edited on /admin (lib/channels.js).
 
 export async function GET() {
+  const list = await getChannels();
   const channels = await Promise.all(
-    CHANNELS.map(async (c) => {
+    list.map(async (c) => {
       try {
         const result = await fetchChannelStreams(c.handle);
         return { ...result, name: c.name || result.name, region: c.region };
