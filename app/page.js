@@ -58,7 +58,7 @@ const LEAGUE_FILTERS = [
   { value: 'ASIA', label: 'SE Asia' },
 ];
 
-// Region filter chip for each YouTube channel's region.
+// Region filter chip for each YouTube channel's region (regions are set on /admin; 'Other' shows under All only).
 const CHANNEL_REGION_FILTER = { Thailand: 'TH', Korea: 'KR', Taiwan: 'TW', Asia: 'ASIA', USA: 'NA' };
 
 // Plays .m3u8 streams: natively in Safari, via hls.js everywhere else.

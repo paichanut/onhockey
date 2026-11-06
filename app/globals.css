@@ -164,3 +164,22 @@ html.app-nav-overlap body { padding-bottom: 56px; }
   }
   .yt-thumb { width: 140px; }
 }
+
+/* /admin channel dashboard */
+.admin { max-width: 760px; padding-top: 28px; padding-bottom: 48px; display: flex; flex-direction: column; gap: 18px; }
+.admin-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.admin-head h1 { margin: 0; font-family: var(--display); font-size: 34px; text-transform: uppercase; }
+.admin-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+.admin-card h2 { margin: 0; font-family: var(--display); font-size: 22px; text-transform: uppercase; }
+.admin-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.admin-row .admin-field { flex: 1 1 200px; }
+.admin-field { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 13px; }
+.admin-field input, .admin-field select { min-height: 44px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--field-line); background: var(--field); color: var(--text); font-size: 15px; }
+.admin-card .btn-primary { align-self: flex-start; }
+.admin-list { list-style: none; margin: 0; padding: 0; }
+.admin-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line-soft); }
+.admin-list li div { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.admin-list a { font-size: 13px; }
+.admin-msg { margin: 0; padding: 10px 14px; border-radius: 8px; font-size: 14px; }
+.admin-msg.ok { background: rgba(92, 200, 255, 0.12); color: var(--accent); }
+.admin-msg.err { background: var(--live-bg); color: var(--live-text); }
